@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "MV.h"
+#include "Funciones.h"
+#include "Disassembler.h"
+#include "Registros.h"
 
 int main(int argc, char *argv[])
 {

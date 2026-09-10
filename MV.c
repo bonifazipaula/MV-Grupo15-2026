@@ -5,3 +5,4 @@
 #include "MV.h"
 #include "Funciones.h"
 #include "Disassembler.h"
+#include "Registros.h"
