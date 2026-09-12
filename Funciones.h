@@ -3,6 +3,7 @@
 #ifndef FUNCIONES_H
 #define FUNCIONES_H
 
+#include "MV.h"
 typedef void (*VectorFunciones[32])(MV *mv);
 
 void iniciaVectorFunciones(VectorFunciones);        //de 00 a 1F
@@ -38,5 +39,5 @@ void NOT(MV *mv);
 
 void STOP(MV *mv);
 
-
+void errorMV(char *mensaje);
 #endif
