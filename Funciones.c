@@ -155,3 +155,9 @@ void NOT(MV *mv){
 void STOP(MV *mv){
 
 }
+
+void errorMV(char *mensaje)
+{
+    fprintf(stderr, "Error: %s\n", mensaje);
+    exit(EXIT_FAILURE);
+}
