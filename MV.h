@@ -23,4 +23,5 @@ typedef struct {
 
 void inicializarMV(MV *mv);
 void cargarPrograma(MV *mv, char *nombreArchivo);
+void ejecutarPrograma(MV *mv);
 #endif

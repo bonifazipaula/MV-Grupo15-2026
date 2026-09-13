@@ -59,9 +59,149 @@ void cargarPrograma(MV *mv, char *nombreArchivo)
             mv->tabla_de_registros[IP] = mv->tabla_de_registros[CS];
           }
       }
+      fclose(Arch);
     }
   
    }
 
 
+int obtenerDirFisica(MV *mv)
+{   int dirFisica;
+    dirFisica = mv->tabla_de_segmentos[0].base +(mv->tabla_de_registros[IP] & 0xFFFF);
+    return dirFisica;
+}
+int cantidadOperandos(int codOp)
+{
+    int cantOper;
+    if (codOp >= 0x10)
+        cantOper = 2;
+    else
+        if (codOp <= 0x0A)
+            cantOper = 1;
+        else
+            if (codOp == 0x0F)
+                cantOper = 0;
+            else
+                errorMV("Instruccion invalida");
+
+    return cantOper;
+}
+void obtenerTiposOperandos(unsigned char instruccion, int cantOper,unsigned char *tipoOpA,unsigned char *tipoOpB)
+{   *tipoOpA = 0;
+    *tipoOpB = 0;
+
+    if (cantOper == 2)
+    {   *tipoOpB = (instruccion >> 6) & 0x03;
+        *tipoOpA = (instruccion >> 4) & 0x03;
+    }
+    else
+        if (cantOper == 1)
+        *tipoOpA = (instruccion >> 6) & 0x03;
+        
+}
+void cargarOperandos(MV *mv, int dirFisica,int cantOper,unsigned char tipoOpA,unsigned char tipoOpB)
+{
+    int posOper;
+    int i;
+
+    mv->tabla_de_registros[OP1] = 0;
+    mv->tabla_de_registros[OP2] = 0;
+
+    posOper = dirFisica + 1;
+
+    if (cantOper == 2)
+    {
+        mv->tabla_de_registros[OP2] =
+            ((long int)tipoOpB << 24);
+
+        for (i = 0; i < tipoOpB; i++)
+            mv->tabla_de_registros[OP2] |=((long int)mv->RAM[posOper + i] << (8 * (tipoOpB - 1 - i)));
+        posOper += tipoOpB;
+    }
+
+    if (cantOper >= 1)
+    {
+        mv->tabla_de_registros[OP1] =((long int)tipoOpA << 24);
+        for (i = 0; i < tipoOpA; i++)
+    mv->tabla_de_registros[OP1] |= ((long int)mv->RAM[posOper + i] << (8 * (tipoOpA - 1 - i)));
+        
+    }
+}
+int obtenerDirFisicaOperando(MV *mv, long int operando)
+{   unsigned char codReg;
+    int offsetFinal, dirFisica;
+    long int valor, ;
+    unsigned short int desplazamiento, offset;
+ 
+    codReg = operando & 0xFF;
+    desplazamiento = (operando >> 8) & 0xFFFF;
+    dirLogica = mv->tabla_de_registros[codReg];
+    segmento = (dirLogica >> 16) & 0xFFFF;
+    offset = dirLogica & 0xFFFF;
+
+    offsetFinal = (int)offset + desplazamiento;
+    if (segmento >=cantSeg)  // por si es mayor a 7, la tabla solo tiene 8 posiciones
+        errorMV("Segmento invalido");
+
+    /*Por si quiere acceder a una pos que ahora no se encuentra habilidada.
+    Evaluar si debe permanecer en la 2da parte del TP*/   
+    if (mv->tabla_de_segmentos[segmento].base == 0xFFFF && mv->tabla_de_segmentos[segmento].tam == 0xFFFF)
+        errorMV("Segmento invalido");
+    if (offsetFinal < 0 || offsetFinal >= mv->tabla_de_segmentos[segmento].tam)
+       errorMV("Direccion fuera del segmento");
+    dirFisica = mv->tabla_de_segmentos[segmento].base + offsetFinal;
+    
+    return dirFisica
+}
+
+/* debo continuar, esta incompleta*/
+long int obtenerValorOperando(MV *mv, long int operando)
+{   unsigned char tipo, codReg;
+    int offsetFinal;
+    long int valor, , dirFisica;
+    short int desplazamiento, segmento, offset;
+    tipo = (operando >> 24) & 0xFF;
+    valor = 0;
+    if (tipo ==2)//inmediato
+        valor = operando & 0xFFFF;
+    else
+        if (tipo ==1)//registro
+            valor = mv->tabla_de_registros[operando & 0xFF];
+        else
+            if (tipo ==3)//memoria
+              dirFisica = obtenerDirFisicaOperando(mv, operando);
+
+
+    return valor;
+}
+void guardarValorOperando(MV *mv, long int operando, long int valor)
+{  unsigned char tipo;
+   tipo = (operando >> 24) & 0xFF;
+}
+
+
+void ejecutarInstruccion(MV *mv)
+{   if (mv->tabla_de_registros[OPC] == 0x0F)
+      mv->tabla_de_registros[IP] = 0xFFFFFFFF;
+}
+void ejecutarPrograma(MV *mv)
+{
+    int dirFisica, cantOper,tamInstr;
+    unsigned char tipoOpA, tipoOpB,instruccion;
+
+    while (mv->tabla_de_registros[IP] != 0xFFFFFFFF &&(mv->tabla_de_registros[IP] & 0xFFFF) < mv->tabla_de_segmentos[0].tam)
+    {
+        dirFisica = obtenerDirFisica(mv);
+        instruccion = mv->RAM[dirFisica];
+        mv->tabla_de_registros[OPC] = instruccion & 0x1F;
+        cantOper = cantidadOperandos(mv->tabla_de_registros[OPC]);
+        obtenerTiposOperandos(instruccion,cantOper,&tipoOpA, &tipoOpB);
+
+       tamInstr = 1 +tipoOpA+tipoOpB;
+
+        cargarOperandos(mv,dirFisica,cantOper,tipoOpA, tipoOpB);
+        mv->tabla_de_registros[IP] += tamInstr;
+        ejecutarInstruccion(mv);
+    }
+}
 
