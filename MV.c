@@ -127,14 +127,16 @@ void cargarOperandos(MV *mv, int dirFisica,int cantOper,unsigned char tipoOpA,un
         
     }
 }
-int obtenerDirFisicaOperando(MV *mv, long int operando)
+int obtenerDirFisicaOperando(MV *mv, long int operando, long int *dirLogicaEfectiva)
 {   unsigned char codReg;
     int offsetFinal, dirFisica;
-    long int valor, ;
-    unsigned short int desplazamiento, offset;
- 
-    codReg = operando & 0xFF;
-    desplazamiento = (operando >> 8) & 0xFFFF;
+    long int dirLogica ;
+    short int desplazamiento;
+    unsigned short int segmento,offset;
+
+    codReg = operando & 0x1F;
+    desplazamiento = (short int)((operando >> 8) & 0xFFFF);
+
     dirLogica = mv->tabla_de_registros[codReg];
     segmento = (dirLogica >> 16) & 0xFFFF;
     offset = dirLogica & 0xFFFF;
@@ -147,37 +149,87 @@ int obtenerDirFisicaOperando(MV *mv, long int operando)
     Evaluar si debe permanecer en la 2da parte del TP*/   
     if (mv->tabla_de_segmentos[segmento].base == 0xFFFF && mv->tabla_de_segmentos[segmento].tam == 0xFFFF)
         errorMV("Segmento invalido");
-    if (offsetFinal < 0 || offsetFinal >= mv->tabla_de_segmentos[segmento].tam)
-       errorMV("Direccion fuera del segmento");
+
+    if (offsetFinal < 0 || offsetFinal+ 4 >= mv->tabla_de_segmentos[segmento].tam)
+        errorMV("Direccion fuera del segmento");
+
+    *dirLogicaEfectiva = ((long int)segmento << 16) | (offsetFinal & 0xFFFF);
     dirFisica = mv->tabla_de_segmentos[segmento].base + offsetFinal;
     
-    return dirFisica
+    return dirFisica;
+}
+void leerMemoria(MV *mv, long int operando, long int *valor)
+{
+    int dirFisica;
+    long int dirLogica;
+
+    dirFisica = obtenerDirFisicaOperando(mv, operando, &dirLogica);
+
+    mv->tabla_de_registros[LAR] = dirLogica;
+    mv->tabla_de_registros[MAR] = ((long int)4 << 16) |  (dirFisica & 0xFFFF);
+
+    *valor = 0;
+
+    *valor |= ((long int)mv->RAM[dirFisica] << 24);
+    *valor |= ((long int)mv->RAM[dirFisica + 1] << 16);
+    *valor |= ((long int)mv->RAM[dirFisica + 2] << 8);
+    *valor |= ((long int)mv->RAM[dirFisica + 3]);
+     mv->tabla_de_registros[MBR] = *valor;
 }
 
-/* debo continuar, esta incompleta*/
-long int obtenerValorOperando(MV *mv, long int operando)
+/* obtengo valor de op1 / op2*/
+long int obtenerValorOperando(MV *mv, long int operando, long int *valor)
 {   unsigned char tipo, codReg;
-    int offsetFinal;
-    long int valor, , dirFisica;
-    short int desplazamiento, segmento, offset;
+   
     tipo = (operando >> 24) & 0xFF;
-    valor = 0;
-    if (tipo ==2)//inmediato
-        valor = operando & 0xFFFF;
-    else
-        if (tipo ==1)//registro
-            valor = mv->tabla_de_registros[operando & 0xFF];
+ 
+    if (tipo == 1)//REGISTRO
+    {   codReg = operando & 0x1F;
+        *valor = mv->tabla_de_registros[codReg];
+    }
+    else 
+      if (tipo == 2)//INMEDIATO
+      { *valor = (short int)(operando & 0xFFFF);
+      }
+      else 
+         if (tipo == 3)//MEMORIA
+        {  leerMemoria(mv, operando, valor);}
         else
-            if (tipo ==3)//memoria
-              dirFisica = obtenerDirFisicaOperando(mv, operando);
+             errorMV("Tipo de operando erroneo");
+}
+void escribirMemoria(MV *mv, long int operando, long int valor)
+{
+    int dirFisica;
+    long int dirLogica;
 
+    dirFisica = obtenerDirFisicaOperando(mv, operando, &dirLogica);
 
-    return valor;
+    mv->tabla_de_registros[LAR] = dirLogica;
+
+    mv->tabla_de_registros[MAR] = ((long int)4 << 16) | (dirFisica & 0xFFFF);
+
+    mv->RAM[dirFisica] = (valor >> 24)& 0xFF;
+    mv->RAM[dirFisica +1] = (valor >> 16) & 0xFF;
+    mv->RAM[dirFisica +2] = (valor >> 8) & 0xFF;
+    mv->RAM[dirFisica +3] = valor & 0xFF;
+
+    mv->tabla_de_registros[MBR] = valor;
 }
 void guardarValorOperando(MV *mv, long int operando, long int valor)
-{  unsigned char tipo;
+{  unsigned char tipo,codReg;
    tipo = (operando >> 24) & 0xFF;
+   if (tipo == 1)
+    {   codReg = operando & 0x1F;
+        mv->tabla_de_registros[codReg] = valor;
+    }
+    else 
+       if (tipo == 3)
+         escribirMemoria(mv, operando, valor);
+        else
+        errorMV("Operando destino invalido");
 }
+
+
 
 
 void ejecutarInstruccion(MV *mv)
