@@ -232,15 +232,18 @@ void guardarValorOperando(MV *mv, long int operando, long int valor)
 
 
 
-void ejecutarInstruccion(MV *mv)
-{   if (mv->tabla_de_registros[OPC] == 0x0F)
-      mv->tabla_de_registros[IP] = 0xFFFFFFFF;
+void ejecutarInstruccion(MV *mv, VectorFunciones vecF)
+{
+    vecF[mv->tabla_de_registros[OPC]](mv);
 }
+
 void ejecutarPrograma(MV *mv)
 {
     int dirFisica, cantOper,tamInstr;
     unsigned char tipoOpA, tipoOpB,instruccion;
+    VectorFunciones vecF;
 
+    iniciaVectorFunciones(vecF);
     while (mv->tabla_de_registros[IP] != 0xFFFFFFFF &&(mv->tabla_de_registros[IP] & 0xFFFF) < mv->tabla_de_segmentos[0].tam)
     {
         dirFisica = obtenerDirFisica(mv);
@@ -253,7 +256,7 @@ void ejecutarPrograma(MV *mv)
 
         cargarOperandos(mv,dirFisica,cantOper,tipoOpA, tipoOpB);
         mv->tabla_de_registros[IP] += tamInstr;
-        ejecutarInstruccion(mv);
+        ejecutarInstruccion(mv,vecF);
     }
 }
 

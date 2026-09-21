@@ -1,5 +1,6 @@
 #include "Funciones.h"
 #include "MV.h"
+#include "Registros.h"
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
@@ -39,69 +40,237 @@ void iniciaVectorFunciones(VectorFunciones vecF)
     vecF[0x0F]=&STOP;
 }
 
+//---------------------------------Extras---------------------------------------------
+void actualizarCC(MV *mv, long int resultado, int carry, int overflow)
+{   mv->tabla_de_registros[CC] = 0;
+    if (resultado & 0x80000000)
+        mv->tabla_de_registros[CC] |= 0x80000000;
+    if (resultado == 0)
+        mv->tabla_de_registros[CC] |= 0x40000000;
+    if (carry)
+        mv->tabla_de_registros[CC] |= 0x20000000;
+    if (overflow)
+        mv->tabla_de_registros[CC] |= 0x10000000;
+}
+
+void errorMV(char *mensaje)
+{
+    fprintf(stderr, "Error: %s\n", mensaje);
+    exit(EXIT_FAILURE);
+}
+void obtenerValoresOperandos(MV *mv, long int *valorOp1, long int *valorOp2)
+{
+    obtenerValorOperando(mv, mv->tabla_de_registros[OP1], valorOp1);
+    obtenerValorOperando(mv, mv->tabla_de_registros[OP2], valorOp2);
+}
 
 //------------------------------- 2 Operandos --------------------------------------
 void MOV(MV *mv){
+    long int valor;
+    obtenerValorOperando(mv, mv->tabla_de_registros[OP2], &valor);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], valor);
 
 }
 
 void ADD(MV *mv){
+    int carry, overflow;
+    long int valorOp1, valorOp2, resultado;
+    unsigned long long int sumaSinSigno;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
 
+    sumaSinSigno = (unsigned int)valorOp1 + (unsigned int)valorOp2;
+    resultado = valorOp1 + valorOp2;
+    resultado = (long int)(unsigned int)sumaSinSigno;
+
+    carry = sumaSinSigno > 0xFFFFFFFF;
+    overflow = 0;
+    if (valorOp1 > 0 && valorOp2 > 0 && resultado < 0)
+        overflow = 1;
+    if (valorOp1 < 0 && valorOp2 < 0 && resultado >= 0)
+        overflow = 1;
+
+    actualizarCC(mv, resultado, carry, overflow);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 }
 
 void SUB(MV *mv){
+    int carry, overflow;
+    long int valorOp1, valorOp2, resultado;
+    long long int resultadoCompleto;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    
+    resultadoCompleto = (long long int)valorOp1 - (long long int)valorOp2;
+    carry = 0;
+     if (resultadoCompleto > 2147483647LL || resultadoCompleto < -2147483648LL)
+        carry = 1;
+
+    resultado = (long int)(unsigned int)resultadoCompleto;
+    overflow = 0;
+
+    if (valorOp1 >= 0 && valorOp2 < 0 && resultado < 0)
+        overflow = 1;
+    if (valorOp1 < 0 && valorOp2 > 0 && resultado >= 0)
+        overflow = 1;
+    actualizarCC(mv, resultado, carry, overflow);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 
 }
 
 void MUL(MV *mv){
+    int carry, overflow;
+    long int valorOp1, valorOp2, resultado;
+    long long int resultadoCompleto;
+
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    resultadoCompleto = (long long int)valorOp1 * (long long int)valorOp2;
+    carry = 0;
+    overflow = 0;
+
+    if (resultadoCompleto > 2147483647LL || resultadoCompleto < -2147483648LL)
+    {   carry = 1;
+        overflow = 1;
+    }
+    resultado = (long int)(unsigned int)resultadoCompleto;
+    actualizarCC(mv, resultado, carry, overflow);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 
 }   
 
 void DIV(MV *mv){
+    int carry, overflow;
+    long int valorOp1, valorOp2, resultado;
+
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    if (valorOp2 == 0)
+        errorMV("Division por cero");
+    resultado = valorOp1 / valorOp2;
+    mv->tabla_de_registros[AC] = valorOp1 % valorOp2;
+    actualizarCC(mv, resultado, 0, 0);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 
 }
 
-void CMP(MV *mv){
+void CMP(MV *mv)
+{   long int valorOp1, valorOp2, resultado;
+    long long int resultadoCompleto;
+    int carry, overflow;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    resultadoCompleto = (long long int)valorOp1 - (long long int)valorOp2;
 
+    carry = 0;
+    if (resultadoCompleto > 2147483647LL || resultadoCompleto < -2147483648LL)
+        carry = 1;
+    resultado = (long int)(unsigned int)resultadoCompleto;
+    overflow = 0;
+
+    if (valorOp1 >= 0 && valorOp2 < 0 && resultado < 0)
+        overflow = 1;
+
+    if (valorOp1 < 0 && valorOp2 > 0 && resultado >= 0)
+        overflow = 1;
+    actualizarCC(mv, resultado, carry, overflow);
 }
 
 void AND(MV *mv){
-
+    long int valorOp1, valorOp2;
+    long int resultado;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    actualizarCC(mv, resultado, 0, 0);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 }
 
 void OR(MV *mv){
+    long int valorOp1, valorOp2;
+    long int resultado;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    resultado = valorOp1 | valorOp2;
+    actualizarCC(mv, resultado, 0, 0);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
     
 }
 
 void XOR(MV *mv){
+    long int valorOp1, valorOp2;
+    long int resultado;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    resultado = valorOp1 ^ valorOp2;
+    actualizarCC(mv, resultado, 0, 0);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
     
 }
 
 void SWAP(MV *mv){
-    
+    long int valorOp1, valorOp2, aux;
+    long int resultado;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    aux = valorOp1;
+    valorOp1 = valorOp2;
+    valorOp2 = aux;
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], valorOp1);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP2], valorOp2);
+    actualizarCC(mv, valorOp1, 0, 0);   
 }
 
 void SHL(MV *mv){
+    long int valorOp1, valorOp2, resultado;
+    long long int resultadoCompleto;
+    int carry, overflow;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    resultadoCompleto = (long long int)valorOp1 << valorOp2;
+   carry = 0;
+    overflow = 0;
+    if (resultadoCompleto > 2147483647LL ||  resultadoCompleto < -2147483648LL)
+    {    carry = 1;
+        overflow = 1;
+    }
+    resultado = (long int)(unsigned int)resultadoCompleto;
+    actualizarCC(mv, resultado, carry, overflow);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
     
 }
 
 void SHR(MV *mv){
-    
+    long int valorOp1, valorOp2;
+    long int resultado;
+    unsigned int valorSinSigno;
+    resultado = valorSinSigno >> valorOp2;
+    actualizarCC(mv, resultado, 0, 0);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 }
-
+//propaga signo
 void SAR(MV *mv){
+    long int valorOp1, valorOp2;
+    long int resultado;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    resultado = valorOp1 >> valorOp2;
+    actualizarCC(mv, resultado, 0, 0);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 
 }
 
 void LDL(MV *mv){
-
+    long int valorOp1, valorOp2;
+    long int resultado;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    resultado = (valorOp1 & 0xFFFF0000) | (valorOp2 & 0x0000FFFF);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 }
 
 void LDH(MV *mv){
+    long int valorOp1, valorOp2;
+    long int resultado;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    resultado = ((valorOp2 & 0x0000FFFF) << 16) | (valorOp1 & 0x0000FFFF);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
     
 }
 
 void RND(MV *mv){
+    long int valorOp1, valorOp2;
+    long int resultado;
+    obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    resultado = rand() % (valorOp2 + 1);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
     
 }
 
@@ -153,11 +322,7 @@ void NOT(MV *mv){
 
 //------------------------------- Sin Operandos --------------------------------------
 void STOP(MV *mv){
-
+     mv->tabla_de_registros[IP] = 0xFFFFFFFF;
 }
 
-void errorMV(char *mensaje)
-{
-    fprintf(stderr, "Error: %s\n", mensaje);
-    exit(EXIT_FAILURE);
-}
+

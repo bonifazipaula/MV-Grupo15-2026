@@ -24,4 +24,6 @@ typedef struct {
 void inicializarMV(MV *mv);
 void cargarPrograma(MV *mv, char *nombreArchivo);
 void ejecutarPrograma(MV *mv);
+long int obtenerValorOperando(MV *mv, long int operando, long int *valor);
+void guardarValorOperando(MV *mv, long int operando, long int valor);
 #endif

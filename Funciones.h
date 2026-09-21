@@ -40,4 +40,6 @@ void NOT(MV *mv);
 void STOP(MV *mv);
 
 void errorMV(char *mensaje);
+
+void actualizarCC(MV *mv, long int resultado, int carry, int overflow);
 #endif
