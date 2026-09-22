@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
-
+#include <stdint.h>         //forzar usar tipos de 32 bits
 
 void iniciaVectorFunciones(VectorFunciones vecF)
 {

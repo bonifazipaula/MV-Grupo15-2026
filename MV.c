@@ -195,7 +195,7 @@ void leerMemoria(MV *mv, long int operando, long int *valor)
 }
 
 /* obtengo valor de op1 / op2*/
-void obtenerValorOperando(MV *mv, uint32_t operando, int32_t *valor)
+void obtenerValorOperando(MV *mv, uint32_t operando, long int *valor)
 {   
     unsigned char tipo = (operando >> 24) & 0xFF;
     unsigned char codReg;
@@ -203,7 +203,7 @@ void obtenerValorOperando(MV *mv, uint32_t operando, int32_t *valor)
     if (tipo == 1) // REGISTRO
     {   
         codReg = operando & 0x1F;
-        *valor = (int32_t)mv->tabla_de_registros[codReg];
+        *valor = mv->tabla_de_registros[codReg];
     }
     else if (tipo == 2) // INMEDIATO
     { 
@@ -213,7 +213,7 @@ void obtenerValorOperando(MV *mv, uint32_t operando, int32_t *valor)
     {  
         long int valorTemp;
         leerMemoria(mv, operando, &valorTemp);
-        *valor = (int32_t)valorTemp;
+        *valor = valorTemp;
     }
     else if (tipo != 0) // Si es 0 (ninguno) no hace nada
     {
@@ -259,7 +259,6 @@ void guardarValorOperando(MV *mv, long int operando, long int valor)
 
 void ejecutarInstruccion(MV *mv, VectorFunciones vecF)
 {
-    printf("Ejecutando instruccion: %02X\n", (unsigned int)mv->tabla_de_registros[OPC]);
     vecF[mv->tabla_de_registros[OPC]](mv);
 }
 
