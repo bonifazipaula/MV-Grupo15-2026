@@ -267,12 +267,10 @@ void ejecutarPrograma(MV *mv)
     int dirFisica, cantOper,tamInstr;
     unsigned char tipoOpA, tipoOpB,instruccion;
     VectorFunciones vecF;
-    int i = 0;
 
     iniciaVectorFunciones(vecF);
     while ((mv->tabla_de_registros[IP] != 0xFFFFFFFF) && ((mv->tabla_de_registros[IP] & 0xFFFF) < mv->tabla_de_segmentos[0].tam))
     {
-        printf("Instruccion %d\n", ++i);
         dirFisica = obtenerDirFisica(mv);
         instruccion = mv->RAM[dirFisica];
         mv->tabla_de_registros[OPC] = instruccion & 0x1F;

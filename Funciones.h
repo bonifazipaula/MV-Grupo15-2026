@@ -4,6 +4,8 @@
 #define FUNCIONES_H
 
 #include "MV.h"
+#include <stdint.h>
+
 typedef void (*VectorFunciones[32])(MV *mv);
 
 void iniciaVectorFunciones(VectorFunciones);        //de 00 a 1F

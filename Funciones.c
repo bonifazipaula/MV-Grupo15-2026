@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
-#include <stdint.h> // Tipos estrictos de 32 y 64 bits
+#include <stdint.h> 
 
 // Máscaras para el registro CC (N Z C V)
 #define MASK_N 0x80000000 // Negativo (bit 31)
@@ -13,9 +13,8 @@
 #define MASK_C 0x20000000 // Acarreo (bit 29)
 #define MASK_V 0x10000000 // Desbordamiento (bit 28)
 
-//inicializa el vector de funciones con las direcciones de las funciones correspondientes
-void iniciaVectorFunciones(VectorFunciones vecF) 
-{
+
+void iniciaVectorFunciones(VectorFunciones vecF) {
     vecF[0x10]=&MOV;
     vecF[0x11]=&ADD;
     vecF[0x12]=&SUB;
@@ -337,24 +336,89 @@ void SYS(MV *mv){
     uint32_t tamValores = (mv->tabla_de_registros[ECX] >> 16) & 0x0000FFFF; // Tamaño (2 bytes más significativos)
     uint32_t punteroEDX = mv->tabla_de_registros[EDX]; // Puntero al inicio de la operación de memoria
 
+    printf("entré al sys\n");
+
     if (valorOp1 == 1) {
         // Lógica para SYS 1 (READ)
         for(uint32_t i = 0; i < cantValores; i++) {
-            // A implementar: leer de teclado (binario/hex/octal/char/decimal según bits en config)
-            // Escribir en memoria usando escribirMemoria() a partir de punteroEDX + (i * tamValores)
+            // Calcular dirección física a partir del puntero lógico
+            uint32_t dirLogica = punteroEDX + (i * tamValores);
+            uint32_t segmento = (dirLogica >> 16) & 0xFFFF;
+            uint32_t offset = dirLogica & 0xFFFF;
+            int dirFisica = mv->tabla_de_segmentos[segmento].base + offset;
+
+            int32_t datoNuevo = 0;
+
+            // Se utiliza if/else if porque al ingresar por teclado solo se puede tipear en una base a la vez
+            // se puede borran los cartelitos pero me parece cómodo para saber que tipo de dato se está ingresando
+            if (config & 0x01) {
+                printf("Ingrese valor (Decimal): ");
+                scanf("%d", &datoNuevo);
+            } else if (config & 0x08) {
+                printf("Ingrese valor (Hexadecimal): ");
+                scanf("%x", &datoNuevo);
+            } else if (config & 0x04) {
+                printf("Ingrese valor (Octal): ");
+                scanf("%o", &datoNuevo);
+            } else if (config & 0x02) {
+                printf("Ingrese Caracter: ");
+                char c;
+                scanf(" %c", &c);
+                datoNuevo = c;
+            } else if (config & 0x10) {
+                printf("Ingrese valor (Binario): ");
+                char binStr[33];
+                scanf("%32s", binStr);
+                datoNuevo = (int32_t)strtol(binStr, NULL, 2);
+            }
+
+            // Guardar en memoria RAM byte a byte en Big Endian
+            for (int b = tamValores - 1; b >= 0; b--) {
+                mv->RAM[dirFisica + b] = datoNuevo & 0xFF;
+                datoNuevo >>= 8;
+            }
         }
     } 
     else if (valorOp1 == 2) {
         // Lógica para SYS 2 (WRITE)
+        printf("entré al sys 2\n");
         for(uint32_t i = 0; i < cantValores; i++) {
-            int32_t datoLeido;
-            // A implementar: leerMemoria() desde punteroEDX + (i * tamValores) a &datoLeido
-            // Imprimir evaluando los bits de la máscara
-            if (config & 0x10) { /* Binario */ } 
-            if (config & 0x08) { /* Hexadecimal */ } 
-            if (config & 0x04) { /* Octal */ } //
-            if (config & 0x02) { /* Caracteres (reemplazando no imprimibles por punto) */ }
-            if (config & 0x01) { /* Decimal */ } //
+            // Calcular dirección física
+            uint32_t dirLogica = punteroEDX + (i * tamValores);
+            uint32_t segmento = (dirLogica >> 16) & 0xFFFF;
+            uint32_t offset = dirLogica & 0xFFFF;
+            int dirFisica = mv->tabla_de_segmentos[segmento].base + offset;
+
+            int32_t datoLeido = 0;
+
+            // construir los bytes desde la memoria RAM (Big Endian)
+            for (uint32_t b = 0; b < tamValores; b++) {
+                datoLeido = (datoLeido << 8) | mv->RAM[dirFisica + b];
+            }
+
+            // Imprimir evaluando los bits de la máscara (pueden ser múltiples formatos simultáneos, por eso no se usa switch)
+            if (config & 0x10) { 
+                printf("0b");
+                for (int bit = (tamValores * 8) - 1; bit >= 0; bit--) {
+                    printf("%d", (datoLeido >> bit) & 1);
+                }
+                printf(" ");
+            }
+            if (config & 0x08) { 
+                printf("0x%X ", datoLeido);
+            }
+            if (config & 0x04) { 
+                printf("0o%o ", datoLeido);
+            }
+            if (config & 0x02) { 
+                char c = (datoLeido >= 32 && datoLeido <= 126) ? (char)datoLeido : '.';
+                printf("%c ", c);
+            }
+            if (config & 0x01) { 
+                printf("tiene que imprimir en decimal\n");
+                printf("%d ", datoLeido);
+            }
+            printf("\n");
         }
     }
 }
