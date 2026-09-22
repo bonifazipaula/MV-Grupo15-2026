@@ -336,8 +336,6 @@ void SYS(MV *mv){
     uint32_t tamValores = (mv->tabla_de_registros[ECX] >> 16) & 0x0000FFFF; // Tamaño (2 bytes más significativos)
     uint32_t punteroEDX = mv->tabla_de_registros[EDX]; // Puntero al inicio de la operación de memoria
 
-    printf("entré al sys\n");
-
     if (valorOp1 == 1) {
         // Lógica para SYS 1 (READ)
         for(uint32_t i = 0; i < cantValores; i++) {
@@ -381,7 +379,6 @@ void SYS(MV *mv){
     } 
     else if (valorOp1 == 2) {
         // Lógica para SYS 2 (WRITE)
-        printf("entré al sys 2\n");
         for(uint32_t i = 0; i < cantValores; i++) {
             // Calcular dirección física
             uint32_t dirLogica = punteroEDX + (i * tamValores);
@@ -415,7 +412,6 @@ void SYS(MV *mv){
                 printf("%c ", c);
             }
             if (config & 0x01) { 
-                printf("tiene que imprimir en decimal\n");
                 printf("%d ", datoLeido);
             }
             printf("\n");
