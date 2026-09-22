@@ -7,6 +7,7 @@
 #include "Funciones.h"
 #include "Disassembler.h"
 #include "Registros.h"
+#include "Segmentos.h"
 
 void inicializarMV(MV *mv)
 {   int i;
@@ -22,6 +23,7 @@ void inicializarMV(MV *mv)
        mv->tabla_de_segmentos[i].tam = 0xFFFF;
     }
 }
+
 void cargarPrograma(MV *mv, char *nombreArchivo)
 { FILE *Arch;
   char identificador[6];
@@ -48,11 +50,11 @@ void cargarPrograma(MV *mv, char *nombreArchivo)
              if (fread(mv->RAM, sizeof(unsigned char), tamCodigo, Arch) != tamCodigo)
                  errorMV("No se pudo leer completamente el codigo");
 
-            mv->tabla_de_segmentos[0].base = 0;
-            mv->tabla_de_segmentos[0].tam = tamCodigo;
+            mv->tabla_de_segmentos[CS].base = 0;
+            mv->tabla_de_segmentos[CS].tam = tamCodigo;
 
-            mv->tabla_de_segmentos[1].base = tamCodigo;
-            mv->tabla_de_segmentos[1].tam = TamRam - tamCodigo;
+            mv->tabla_de_segmentos[DS].base = tamCodigo;
+            mv->tabla_de_segmentos[DS].tam = TamRam - tamCodigo;
 
             mv->tabla_de_registros[CS] = 0x00000000;
             mv->tabla_de_registros[DS] = 0x00010000;
@@ -67,7 +69,7 @@ void cargarPrograma(MV *mv, char *nombreArchivo)
 
 int obtenerDirFisica(MV *mv)
 {   int dirFisica;
-    dirFisica = mv->tabla_de_segmentos[0].base +(mv->tabla_de_registros[IP] & 0xFFFF);
+    dirFisica = mv->tabla_de_segmentos[CS].base +(mv->tabla_de_registros[IP] & 0xFFFF);
     return dirFisica;
 }
 int cantidadOperandos(int codOp)
@@ -86,6 +88,7 @@ int cantidadOperandos(int codOp)
 
     return cantOper;
 }
+
 void obtenerTiposOperandos(unsigned char instruccion, int cantOper,unsigned char *tipoOpA,unsigned char *tipoOpB)
 {   *tipoOpA = 0;
     *tipoOpB = 0;
@@ -99,6 +102,7 @@ void obtenerTiposOperandos(unsigned char instruccion, int cantOper,unsigned char
         *tipoOpA = (instruccion >> 6) & 0x03;
         
 }
+
 void cargarOperandos(MV *mv, int dirFisica,int cantOper,unsigned char tipoOpA,unsigned char tipoOpB)
 {
     int posOper;
@@ -127,6 +131,7 @@ void cargarOperandos(MV *mv, int dirFisica,int cantOper,unsigned char tipoOpA,un
         
     }
 }
+
 int obtenerDirFisicaOperando(MV *mv, long int operando, long int *dirLogicaEfectiva)
 {   unsigned char codReg;
     int offsetFinal, dirFisica;
@@ -158,6 +163,7 @@ int obtenerDirFisicaOperando(MV *mv, long int operando, long int *dirLogicaEfect
     
     return dirFisica;
 }
+
 void leerMemoria(MV *mv, long int operando, long int *valor)
 {
     int dirFisica;
@@ -197,6 +203,7 @@ long int obtenerValorOperando(MV *mv, long int operando, long int *valor)
         else
              errorMV("Tipo de operando erroneo");
 }
+
 void escribirMemoria(MV *mv, long int operando, long int valor)
 {
     int dirFisica;
@@ -215,6 +222,7 @@ void escribirMemoria(MV *mv, long int operando, long int valor)
 
     mv->tabla_de_registros[MBR] = valor;
 }
+
 void guardarValorOperando(MV *mv, long int operando, long int valor)
 {  unsigned char tipo,codReg;
    tipo = (operando >> 24) & 0xFF;
