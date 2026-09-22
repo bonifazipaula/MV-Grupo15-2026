@@ -50,11 +50,11 @@ void cargarPrograma(MV *mv, char *nombreArchivo)
              if (fread(mv->RAM, sizeof(unsigned char), tamCodigo, Arch) != tamCodigo)
                  errorMV("No se pudo leer completamente el codigo");
 
-            mv->tabla_de_segmentos[CS].base = 0;
-            mv->tabla_de_segmentos[CS].tam = tamCodigo;
+            mv->tabla_de_segmentos[CS_Seg].base = 0;
+            mv->tabla_de_segmentos[CS_Seg].tam = tamCodigo;
 
-            mv->tabla_de_segmentos[DS].base = tamCodigo;
-            mv->tabla_de_segmentos[DS].tam = TamRam - tamCodigo;
+            mv->tabla_de_segmentos[DS_Seg].base = tamCodigo;
+            mv->tabla_de_segmentos[DS_Seg].tam = TamRam - tamCodigo;
 
             mv->tabla_de_registros[CS] = 0x00000000;
             mv->tabla_de_registros[DS] = 0x00010000;
@@ -69,7 +69,7 @@ void cargarPrograma(MV *mv, char *nombreArchivo)
 
 int obtenerDirFisica(MV *mv)
 {   int dirFisica;
-    dirFisica = mv->tabla_de_segmentos[CS].base +(mv->tabla_de_registros[IP] & 0xFFFF);
+    dirFisica = mv->tabla_de_segmentos[CS_Seg].base +(mv->tabla_de_registros[IP] & 0xFFFF);
     return dirFisica;
 }
 int cantidadOperandos(int codOp)
