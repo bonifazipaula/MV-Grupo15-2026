@@ -1,11 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "MV.h"
+#include "Funciones.h"
 
 int main(int argc, char *argv[])
 {   MV maquina;
     inicializarMV(&maquina);
+    /*
+    creo que no es necesario ya que se carga 2 veces el progama
     cargarPrograma(&maquina, argv[1]);
+    */
     if (argc > 1)
         cargarPrograma(&maquina, argv[1]);
     else

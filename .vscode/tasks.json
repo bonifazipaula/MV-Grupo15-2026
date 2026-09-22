@@ -9,7 +9,7 @@
                 "-g",
                 "${workspaceFolder}/*.c", 
                 "-o",
-                "${workspaceFolder}/vmx"
+                "${workspaceFolder}/Ejecutables/Traductor MV1/vmx"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

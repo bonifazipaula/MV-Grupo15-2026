@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdint.h>     //forzar tipos de 32 bits
 
 #include "MV.h"
 #include "Funciones.h"
@@ -24,6 +25,7 @@ void inicializarMV(MV *mv)
     }
 }
 
+
 void cargarPrograma(MV *mv, char *nombreArchivo)
 { FILE *Arch;
   char identificador[6];
@@ -44,9 +46,18 @@ void cargarPrograma(MV *mv, char *nombreArchivo)
           if(version!=1)
             errorMV("Version VMX invalida");
           else
-          {  fread(&tamCodigo, sizeof(unsigned short int), 1, Arch);  
+          {  
+             // leemos los 2 bytes que representan el tamaño del código
+             //no podes hacer el fread de una porque sino levanta en little endian en vez de big endiand
+             unsigned char bufferTam[2];
+             fread(bufferTam, sizeof(unsigned char), 2, Arch);
+             
+             // Desplazamos el primer byte 8 lugares a la izquierda y le sumamos el segundo
+             tamCodigo = (bufferTam[0] << 8) | bufferTam[1];
+
              if (tamCodigo > TamRam)
                  errorMV("El programa es demasiado grande para la memoria");
+            
              if (fread(mv->RAM, sizeof(unsigned char), tamCodigo, Arch) != tamCodigo)
                  errorMV("No se pudo leer completamente el codigo");
 
@@ -59,6 +70,8 @@ void cargarPrograma(MV *mv, char *nombreArchivo)
             mv->tabla_de_registros[CS] = 0x00000000;
             mv->tabla_de_registros[DS] = 0x00010000;
             mv->tabla_de_registros[IP] = mv->tabla_de_registros[CS];
+
+            ejecutarPrograma(mv);
           }
       }
       fclose(Arch);
@@ -72,6 +85,7 @@ int obtenerDirFisica(MV *mv)
     dirFisica = mv->tabla_de_segmentos[CS_Seg].base +(mv->tabla_de_registros[IP] & 0xFFFF);
     return dirFisica;
 }
+
 int cantidadOperandos(int codOp)
 {
     int cantOper;
@@ -103,32 +117,29 @@ void obtenerTiposOperandos(unsigned char instruccion, int cantOper,unsigned char
         
 }
 
-void cargarOperandos(MV *mv, int dirFisica,int cantOper,unsigned char tipoOpA,unsigned char tipoOpB)
+void cargarOperandos(MV *mv, int dirFisica, int cantOper, unsigned char tipoOpA, unsigned char tipoOpB)
 {
-    int posOper;
+    int posOper = dirFisica + 1;
     int i;
 
     mv->tabla_de_registros[OP1] = 0;
     mv->tabla_de_registros[OP2] = 0;
 
-    posOper = dirFisica + 1;
-
     if (cantOper == 2)
     {
-        mv->tabla_de_registros[OP2] =
-            ((long int)tipoOpB << 24);
+        // Se castea a uint32_t para asegurar que el desplazamiento de 24 bits quede en el byte más alto de 4 bytes
+        mv->tabla_de_registros[OP2] = ((uint32_t)tipoOpB << 24);
 
         for (i = 0; i < tipoOpB; i++)
-            mv->tabla_de_registros[OP2] |=((long int)mv->RAM[posOper + i] << (8 * (tipoOpB - 1 - i)));
+            mv->tabla_de_registros[OP2] |= ((uint32_t)mv->RAM[posOper + i] << (8 * (tipoOpB - 1 - i)));
         posOper += tipoOpB;
     }
 
     if (cantOper >= 1)
     {
-        mv->tabla_de_registros[OP1] =((long int)tipoOpA << 24);
+        mv->tabla_de_registros[OP1] = ((uint32_t)tipoOpA << 24);
         for (i = 0; i < tipoOpA; i++)
-    mv->tabla_de_registros[OP1] |= ((long int)mv->RAM[posOper + i] << (8 * (tipoOpA - 1 - i)));
-        
+            mv->tabla_de_registros[OP1] |= ((uint32_t)mv->RAM[posOper + i] << (8 * (tipoOpA - 1 - i)));
     }
 }
 
@@ -184,24 +195,30 @@ void leerMemoria(MV *mv, long int operando, long int *valor)
 }
 
 /* obtengo valor de op1 / op2*/
-long int obtenerValorOperando(MV *mv, long int operando, long int *valor)
-{   unsigned char tipo, codReg;
-   
-    tipo = (operando >> 24) & 0xFF;
+void obtenerValorOperando(MV *mv, uint32_t operando, int32_t *valor)
+{   
+    unsigned char tipo = (operando >> 24) & 0xFF;
+    unsigned char codReg;
  
-    if (tipo == 1)//REGISTRO
-    {   codReg = operando & 0x1F;
-        *valor = mv->tabla_de_registros[codReg];
+    if (tipo == 1) // REGISTRO
+    {   
+        codReg = operando & 0x1F;
+        *valor = (int32_t)mv->tabla_de_registros[codReg];
     }
-    else 
-      if (tipo == 2)//INMEDIATO
-      { *valor = (short int)(operando & 0xFFFF);
-      }
-      else 
-         if (tipo == 3)//MEMORIA
-        {  leerMemoria(mv, operando, valor);}
-        else
-             errorMV("Tipo de operando erroneo");
+    else if (tipo == 2) // INMEDIATO
+    { 
+        *valor = (int16_t)(operando & 0xFFFF);
+    }
+    else if (tipo == 3) // MEMORIA
+    {  
+        long int valorTemp;
+        leerMemoria(mv, operando, &valorTemp);
+        *valor = (int32_t)valorTemp;
+    }
+    else if (tipo != 0) // Si es 0 (ninguno) no hace nada
+    {
+        errorMV("Tipo de operando erroneo");
+    }
 }
 
 void escribirMemoria(MV *mv, long int operando, long int valor)
@@ -242,6 +259,7 @@ void guardarValorOperando(MV *mv, long int operando, long int valor)
 
 void ejecutarInstruccion(MV *mv, VectorFunciones vecF)
 {
+    printf("Ejecutando instruccion: %02X\n", (unsigned int)mv->tabla_de_registros[OPC]);
     vecF[mv->tabla_de_registros[OPC]](mv);
 }
 
@@ -250,17 +268,19 @@ void ejecutarPrograma(MV *mv)
     int dirFisica, cantOper,tamInstr;
     unsigned char tipoOpA, tipoOpB,instruccion;
     VectorFunciones vecF;
+    int i = 0;
 
     iniciaVectorFunciones(vecF);
-    while (mv->tabla_de_registros[IP] != 0xFFFFFFFF &&(mv->tabla_de_registros[IP] & 0xFFFF) < mv->tabla_de_segmentos[0].tam)
+    while ((mv->tabla_de_registros[IP] != 0xFFFFFFFF) && ((mv->tabla_de_registros[IP] & 0xFFFF) < mv->tabla_de_segmentos[0].tam))
     {
+        printf("Instruccion %d\n", ++i);
         dirFisica = obtenerDirFisica(mv);
         instruccion = mv->RAM[dirFisica];
         mv->tabla_de_registros[OPC] = instruccion & 0x1F;
         cantOper = cantidadOperandos(mv->tabla_de_registros[OPC]);
         obtenerTiposOperandos(instruccion,cantOper,&tipoOpA, &tipoOpB);
-
-       tamInstr = 1 +tipoOpA+tipoOpB;
+        
+        tamInstr = 1 +tipoOpA+tipoOpB;
 
         cargarOperandos(mv,dirFisica,cantOper,tipoOpA, tipoOpB);
         mv->tabla_de_registros[IP] += tamInstr;

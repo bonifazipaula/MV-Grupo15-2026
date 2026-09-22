@@ -5,6 +5,8 @@
 #ifndef MV_H
 #define MV_H
 
+#include <stdint.h>
+
 #define cantSeg 8       //  si bien en esta primera parte son 2 se deben inicializar los otros
 #define cantReg 32      // en la primer parte usamos 17
 #define TamRam 16384
@@ -24,6 +26,6 @@ typedef struct {
 void inicializarMV(MV *mv);
 void cargarPrograma(MV *mv, char *nombreArchivo);
 void ejecutarPrograma(MV *mv);
-long int obtenerValorOperando(MV *mv, long int operando, long int *valor);
+void obtenerValorOperando(MV *mv, uint32_t operando, int32_t *valor);
 void guardarValorOperando(MV *mv, long int operando, long int valor);
 #endif
