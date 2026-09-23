@@ -6,28 +6,16 @@
 int main(int argc, char *argv[])
 {   MV maquina;
     inicializarMV(&maquina);
-    /*
-    creo que no es necesario ya que se carga 2 veces el progama
-    cargarPrograma(&maquina, argv[1]);
-    */
+
     if (argc > 1)
-        cargarPrograma(&maquina, argv[1]);
+        cargarPrograma(&maquina, argv[1], argc > 2 ? argv[2] : NULL);
     else
         errorMV("Falta indicar el archivo VMX");
 
-   
-
-
-    /*
-    //vector para poder obtener los argumentos de la linea de comandos
-    char* argumento[2];
-    printf("holus\n");
-
-    argumento[0]=NULL;
-    argumento[1]=NULL;
-
-    argumento[0] = argv[1];         //código traducido
-    argumento[1] = argv[2];         // flag, si no es null se muestra el disassembler
-    */
     return 0;
 }
+
+/*
+    argv[1];         //código traducido
+    argv[2];         // flag, si no es null se muestra el disassembler
+*/

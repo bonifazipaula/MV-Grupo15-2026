@@ -2,8 +2,8 @@
 
 #ifndef Disassembler_H_INCLUDED
 #define Disassembler_H_INCLUDED
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "MV.h"
+
+void muestraInstruccion(MV *mv, int dirFisica, int tamInstr);
 
 #endif

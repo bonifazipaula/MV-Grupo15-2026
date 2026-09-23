@@ -393,6 +393,7 @@ void SYS(MV *mv){
                 datoLeido = (datoLeido << 8) | mv->RAM[dirFisica + b];
             }
 
+            printf("[%04X]", dirLogica);
             // Imprimir evaluando los bits de la máscara (pueden ser múltiples formatos simultáneos, por eso no se usa switch)
             if (config & 0x10) { 
                 printf("0b");

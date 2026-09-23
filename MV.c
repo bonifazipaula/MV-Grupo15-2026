@@ -26,7 +26,7 @@ void inicializarMV(MV *mv)
 }
 
 
-void cargarPrograma(MV *mv, char *nombreArchivo)
+void cargarPrograma(MV *mv, char *nombreArchivo, char *flag)
 { FILE *Arch;
   char identificador[6];
   unsigned char version;
@@ -71,7 +71,7 @@ void cargarPrograma(MV *mv, char *nombreArchivo)
             mv->tabla_de_registros[DS] = 0x00010000;
             mv->tabla_de_registros[IP] = mv->tabla_de_registros[CS];
 
-            ejecutarPrograma(mv);
+            ejecutarPrograma(mv, flag);
           }
       }
       fclose(Arch);
@@ -262,7 +262,7 @@ void ejecutarInstruccion(MV *mv, VectorFunciones vecF)
     vecF[mv->tabla_de_registros[OPC]](mv);
 }
 
-void ejecutarPrograma(MV *mv)
+void ejecutarPrograma(MV *mv, char *flag)
 {
     int dirFisica, cantOper,tamInstr;
     unsigned char tipoOpA, tipoOpB,instruccion;
@@ -281,6 +281,10 @@ void ejecutarPrograma(MV *mv)
 
         cargarOperandos(mv,dirFisica,cantOper,tipoOpA, tipoOpB);
         mv->tabla_de_registros[IP] += tamInstr;
+
+        if (flag != NULL)
+            muestraInstruccion(mv, dirFisica, tamInstr);
+
         ejecutarInstruccion(mv,vecF);
     }
 }

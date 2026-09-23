@@ -1,4 +1,4 @@
-MOV [3], 'a'
+MOV [3], 'a'        ; culo
 MOV [2], 'l'
 MOV [1], 'o'
 MOV [0], 'H'

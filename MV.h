@@ -24,8 +24,8 @@ typedef struct {
 /*funciones de la maquina virtual*/
 
 void inicializarMV(MV *mv);
-void cargarPrograma(MV *mv, char *nombreArchivo);
-void ejecutarPrograma(MV *mv);
+void cargarPrograma(MV *mv, char *nombreArchivo, char *flag);
+void ejecutarPrograma(MV *mv, char *flag);
 void obtenerValorOperando(MV *mv, uint32_t operando, int32_t *valor);
 void guardarValorOperando(MV *mv, long int operando, long int valor);
 #endif
