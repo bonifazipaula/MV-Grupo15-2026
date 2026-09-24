@@ -1,4 +1,4 @@
-OUT_DIR = Ejecutables/Traductor\ MV1
+OUT_DIR = Ejecutables/MV1
 
 vmx: main.c MV.c Funciones.c Disassembler.c
 	mkdir -p $(OUT_DIR)

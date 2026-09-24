@@ -17,3 +17,4 @@ Fin: 	MOV [4], ECX
         LDH ECX, 4
         MOV EAX, 0x9
         SYS 0x2
+        STOP

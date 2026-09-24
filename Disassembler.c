@@ -44,7 +44,6 @@ void formatearOperando(uint32_t operando, char *buffer) {
     else if (tipo == 2) { // Inmediato
         int16_t inmediato = (int16_t)(operando & 0xFFFF);
         
-        // Heurística para mostrar igual a la cátedra ('a', 0x12, 3, etc.)
         if (inmediato >= 32 && inmediato <= 126) {
             sprintf(buffer, "'%c'", (char)inmediato);
         } else if (inmediato > 9 || inmediato < -9) {
@@ -57,7 +56,7 @@ void formatearOperando(uint32_t operando, char *buffer) {
         uint32_t codReg = operando & 0x1F;
         int16_t desp = (int16_t)((operando >> 8) & 0xFFFF);
 
-        if (codReg == 27) { // DS (se omite el registro según la especificación)
+        if (codReg == 27) { 
             if (desp == 0) sprintf(buffer, "[0]");
             else sprintf(buffer, "[%d]", desp);
         } else {
