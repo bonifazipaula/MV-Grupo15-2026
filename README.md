@@ -35,7 +35,7 @@ make
 El comando crea el directorio de salida si no existe y genera el ejecutable:
 
 ```text
-Ejecutables/Traductor MV1/vmx
+Ejecutables/MV1/vmx
 ```
 
 También se puede compilar directamente el target del Makefile:
@@ -55,7 +55,7 @@ make clean
 El ejecutable recibe como argumento la ruta a un archivo `.vmx`:
 
 ```bash
-"Ejecutables/Traductor MV1/vmx" "Ejecutables/Traductor MV1/ejemplo.vmx"
+./vmx filename.vmx [-d]
 ```
 
 Si no se indica un archivo, o si el archivo no tiene un formato VMX válido, la
