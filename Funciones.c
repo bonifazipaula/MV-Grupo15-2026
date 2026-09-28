@@ -77,42 +77,39 @@ void obtenerValoresOperandos(MV *mv, int32_t *valorOp1, int32_t *valorOp2)
 void MOV(MV *mv){
     int32_t valor;
     obtenerValorOperando(mv, mv->tabla_de_registros[OP2], &valor);
+    actualizarCC(mv, valor, 0, 0);
     guardarValorOperando(mv, mv->tabla_de_registros[OP1], valor);
 }
 
 void ADD(MV *mv){
-    int carry, overflow;
-    int32_t valorOp1, valorOp2, resultado;
-    uint64_t sumaSinSigno;
-    int64_t sumaCompleta;
-    
+    int32_t valorOp1, valorOp2;
     obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
-
-    sumaSinSigno = (uint32_t)valorOp1 + (uint32_t)valorOp2;
-    sumaCompleta = (int64_t)valorOp1 + (int64_t)valorOp2;
-    resultado = (int32_t)sumaCompleta;
-
-    carry = (sumaSinSigno > 0xFFFFFFFF) ? 1 : 0;
-    overflow = (sumaCompleta > 2147483647LL || sumaCompleta < -2147483648LL) ? 1 : 0;
-
+    int32_t resultado = valorOp1 + valorOp2;
+  
+    int carry = (((uint64_t)(uint32_t)valorOp1 + (uint32_t)valorOp2) > 0xFFFFFFFF) ? 1 : 0;
+    
+    int overflow = 0;
+    if ((valorOp1 > 0 && valorOp2 > 0 && resultado < 0) || 
+        (valorOp1 < 0 && valorOp2 < 0 && resultado >= 0)) {
+        overflow = 1;
+    }
+    
     actualizarCC(mv, resultado, carry, overflow);
     guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 }
 
 void SUB(MV *mv){
-    int carry, overflow;
-    int32_t valorOp1, valorOp2, resultado;
-    int64_t resultadoCompleto;
-    
+    int32_t valorOp1, valorOp2;
     obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
+    int32_t resultado = valorOp1 - valorOp2;
     
-    resultadoCompleto = (int64_t)valorOp1 - (int64_t)valorOp2;
-    carry = (resultadoCompleto > 2147483647LL || resultadoCompleto < -2147483648LL) ? 1 : 0;
-    resultado = (int32_t)resultadoCompleto;
-    overflow = 0;
-
-    if (valorOp1 >= 0 && valorOp2 < 0 && resultado < 0) overflow = 1;
-    if (valorOp1 < 0 && valorOp2 > 0 && resultado >= 0) overflow = 1;
+    int carry = ((uint32_t)valorOp1 < (uint32_t)valorOp2) ? 1 : 0;
+    
+    int overflow = 0;
+    if ((valorOp1 >= 0 && valorOp2 < 0 && resultado < 0) || 
+        (valorOp1 < 0 && valorOp2 > 0 && resultado >= 0)) {
+        overflow = 1;
+    }
     
     actualizarCC(mv, resultado, carry, overflow);
     guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
@@ -141,27 +138,25 @@ void DIV(MV *mv){
     
     resultado = valorOp1 / valorOp2;
     mv->tabla_de_registros[AC] = (uint32_t)(valorOp1 % valorOp2); // Guarda el resto en AC
-    
+
     actualizarCC(mv, resultado, 0, 0);
     guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 }
 
 void CMP(MV *mv){
-    int32_t valorOp1, valorOp2, resultado;
-    int64_t resultadoCompleto;
-    int carry, overflow;
-    
+    int32_t valorOp1, valorOp2;
     obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
-    resultadoCompleto = (int64_t)valorOp1 - (int64_t)valorOp2;
-
-    carry = (resultadoCompleto > 2147483647LL || resultadoCompleto < -2147483648LL) ? 1 : 0;
-    resultado = (int32_t)resultadoCompleto;
-    overflow = 0;
-
-    if (valorOp1 >= 0 && valorOp2 < 0 && resultado < 0) overflow = 1;
-    if (valorOp1 < 0 && valorOp2 > 0 && resultado >= 0) overflow = 1;
+    int32_t resultado = valorOp1 - valorOp2;
     
-    actualizarCC(mv, resultado, carry, overflow); // No almacena el resultado, solo setea CC
+    int carry = ((uint32_t)valorOp1 < (uint32_t)valorOp2) ? 1 : 0;
+    
+    int overflow = 0;
+    if ((valorOp1 >= 0 && valorOp2 < 0 && resultado < 0) || 
+        (valorOp1 < 0 && valorOp2 > 0 && resultado >= 0)) {
+        overflow = 1;
+    }
+    
+    actualizarCC(mv, resultado, carry, overflow); // Solo modifica CC, no almacena resultado[cite: 1]
 }
 
 void AND(MV *mv){
@@ -200,34 +195,47 @@ void SWAP(MV *mv){
 }
 
 void SHL(MV *mv){
-    int32_t valorOp1, valorOp2, resultado;
-    int64_t resultadoCompleto;
-    int carry, overflow;
-    
+    int32_t valorOp1, valorOp2;
     obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
-    resultadoCompleto = (int64_t)valorOp1 << valorOp2;
+    uint32_t uval = (uint32_t)valorOp1;
+    uint32_t resultado = uval << valorOp2;
     
-    carry = overflow = (resultadoCompleto > 2147483647LL || resultadoCompleto < -2147483648LL) ? 1 : 0;
-    resultado = (int32_t)resultadoCompleto;
+    int carry = 0;
+    if (valorOp2 > 0 && valorOp2 <= 32) {
+        carry = (uval >> (32 - valorOp2)) & 1; 
+    }
     
-    actualizarCC(mv, resultado, carry, overflow);
-    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
+    actualizarCC(mv, (int32_t)resultado, carry, 0);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], (int32_t)resultado);
 }
 
 void SHR(MV *mv){
-    int32_t valorOp1, valorOp2, resultado;
+    int32_t valorOp1, valorOp2;
     obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
-    uint32_t valorSinSigno = (uint32_t)valorOp1; // Casteo a sin signo para llenar con ceros
-    resultado = (int32_t)(valorSinSigno >> valorOp2);
-    actualizarCC(mv, resultado, 0, 0);
-    guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
+    
+    uint32_t uval = (uint32_t)valorOp1;
+    uint32_t resultado = uval >> valorOp2; // Rellena con ceros lógicos
+    
+    int carry = 0;
+    if (valorOp2 > 0 && valorOp2 <= 32) {
+        carry = (uval >> (valorOp2 - 1)) & 1; // El bit de la derecha que se cae
+    }
+    
+    actualizarCC(mv, (int32_t)resultado, carry, 0);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], (int32_t)resultado);
 }
 
 void SAR(MV *mv){
-    int32_t valorOp1, valorOp2, resultado;
+    int32_t valorOp1, valorOp2;
     obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
-    resultado = valorOp1 >> valorOp2; // Shift aritmético (C propaga el signo en enteros con signo)
-    actualizarCC(mv, resultado, 0, 0);
+    int32_t resultado = valorOp1 >> valorOp2; 
+    
+    int carry = 0;
+    if (valorOp2 > 0 && valorOp2 <= 32) {
+        carry = (valorOp1 >> (valorOp2 - 1)) & 1;
+    }
+    
+    actualizarCC(mv, resultado, carry, 0);
     guardarValorOperando(mv, mv->tabla_de_registros[OP1], resultado);
 }
 
@@ -347,6 +355,8 @@ void SYS(MV *mv){
 
             int32_t datoNuevo = 0;
 
+            printf("[%04X]", dirFisica);
+
             // Se utiliza if/else if porque al ingresar por teclado solo se puede tipear en una base a la vez
             // se puede borran los cartelitos pero me parece cómodo para saber que tipo de dato se está ingresando
             if (config & 0x01) {
@@ -393,7 +403,7 @@ void SYS(MV *mv){
                 datoLeido = (datoLeido << 8) | mv->RAM[dirFisica + b];
             }
 
-            printf("[%04X]", dirLogica);
+            printf("[%04X]", dirFisica);
             // Imprimir evaluando los bits de la máscara (pueden ser múltiples formatos simultáneos, por eso no se usa switch)
             if (config & 0x10) { 
                 printf("0b");

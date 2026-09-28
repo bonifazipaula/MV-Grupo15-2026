@@ -83,6 +83,7 @@ void cargarPrograma(MV *mv, char *nombreArchivo, char *flag)
 int obtenerDirFisica(MV *mv)
 {   int dirFisica;
     dirFisica = mv->tabla_de_segmentos[CS_Seg].base +(mv->tabla_de_registros[IP] & 0xFFFF);
+
     return dirFisica;
 }
 
