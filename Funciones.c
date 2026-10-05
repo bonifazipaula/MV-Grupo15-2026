@@ -103,7 +103,7 @@ void SUB(MV *mv){
     obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
     int32_t resultado = valorOp1 - valorOp2;
     
-    int carry = ((uint32_t)valorOp1 < (uint32_t)valorOp2) ? 1 : 0;
+    int carry = ((uint32_t)valorOp1 >= (uint32_t)valorOp2) ? 1 : 0;
     
     int overflow = 0;
     if ((valorOp1 >= 0 && valorOp2 < 0 && resultado < 0) || 
@@ -148,7 +148,7 @@ void CMP(MV *mv){
     obtenerValoresOperandos(mv, &valorOp1, &valorOp2);
     int32_t resultado = valorOp1 - valorOp2;
     
-    int carry = ((uint32_t)valorOp1 < (uint32_t)valorOp2) ? 1 : 0;
+    int carry = ((uint32_t)valorOp1 >= (uint32_t)valorOp2) ? 1 : 0;
     
     int overflow = 0;
     if ((valorOp1 >= 0 && valorOp2 < 0 && resultado < 0) || 
