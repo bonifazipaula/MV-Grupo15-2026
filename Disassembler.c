@@ -23,9 +23,9 @@ const char* obtenerMnemonico(uint32_t opc) {
 const char* nombreRegistro(uint32_t codReg) {
     // Mapeo estándar según las posiciones numéricas (10=EAX, 27=DS, etc.)
     static const char* nombres[32] = {
-        "IP", "OPC", "OP1", "OP2", "LAR", "MAR", "MBR", "R7", "R8", "R9",
+        "IP", "OPC", "OP1", "OP2", "LAR", "MAR", "MBR", "SP", "BP", "R9",
         "EAX", "EBX", "ECX", "EDX", "EEX", "EFX", "AC", "CC", "R18", "R19",
-        "R20", "R21", "R22", "R23", "R24", "R25", "CS", "DS", "R28", "R29", "R30", "R31"
+        "R20", "R21", "R22", "R23", "R24", "R25", "CS", "DS", "ES", "SS", "KS", "PS"
     };
     if (codReg < 32) return nombres[codReg];
     return "???";
