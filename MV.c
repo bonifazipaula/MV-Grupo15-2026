@@ -39,7 +39,11 @@ void cargarPrograma(MV *mv, char *nombreArchivo, char *flag)
   {  fread(identificador,sizeof(char),5,Arch);
      identificador[5] = '\0';
     
-     if (strcmp(identificador, "VMX26") != 0)
+     if (strcmp(identificador, "VMI26") == 0) {   
+         fclose(Arch);
+         cargarImagen(mv, nombreArchivo);
+     }
+     else if (strcmp(identificador, "VMX26") != 0)
        errorMV("Archivo VMX invalido identificador erroneo");
      else
      {    fread(&version,sizeof(unsigned char),1,Arch);
@@ -79,6 +83,65 @@ void cargarPrograma(MV *mv, char *nombreArchivo, char *flag)
   
    }
 
+void cargarImagen(MV *mv, char *nombreArchivo)
+{
+    FILE *Arch;
+    char identificador[6];
+    unsigned char version;
+    unsigned char buffer[4];
+    unsigned short int tamMemoriaKiB;
+    unsigned int i;
+    uint32_t valor;
+
+    Arch = fopen(nombreArchivo, "rb");
+
+    if (Arch == NULL)
+        errorMV("No se pudo abrir el archivo VMI");
+    else{
+        fread(identificador, sizeof(char), 5, Arch);
+        identificador[5] = '\0';
+
+        if (strcmp(identificador, "VMI26") != 0)
+            errorMV("Identificador VMI invalido");
+        else{
+            fread(&version, sizeof(unsigned char), 1, Arch);
+            if (version != 1)
+                errorMV("Version VMI Incorrecta");
+            else{
+                //Leemos el tamaño de memoria, expresado en KiB 
+                fread(buffer, sizeof(unsigned char), 2, Arch);
+                tamMemoriaKiB = ((unsigned short int)buffer[0] << 8) | buffer[1];
+                if (tamMemoriaKiB != TamRam / 1024)
+                    errorMV("La Imagen es de un tamaño de memoria diferente al de la RAM");
+                
+                //Leemos los 32 registros, de 4 bytes cada uno 
+                for (i = 0; i < cantReg; i++){
+                     fread(buffer, sizeof(unsigned char), 4, Arch) != 4;
+
+                     valor = ((uint32_t)buffer[0] << 24)
+                            | ((uint32_t)buffer[1] << 16)
+                            | ((uint32_t)buffer[2] << 8)
+                            | (uint32_t)buffer[3];
+
+                     mv->tabla_de_registros[i] = (long int)valor;
+                }
+                //Leemos todos los Segmentos 
+                    for (i = 0; i < cantSeg; i++){
+                        fread(buffer, sizeof(unsigned char), 4, Arch) != 4;
+
+                        mv->tabla_de_segmentos[i].base =
+                            ((unsigned short int)buffer[0] << 8) | buffer[1];
+
+                        mv->tabla_de_segmentos[i].tam =
+                            ((unsigned short int)buffer[2] << 8) | buffer[3];
+                    }
+                //Leemos la memoria principal
+                fread(mv->RAM, sizeof(unsigned char), TamRam, Arch);
+            }
+        }
+     fclose(Arch);
+    }
+}
 
 int obtenerDirFisica(MV *mv)
 {   int dirFisica;
