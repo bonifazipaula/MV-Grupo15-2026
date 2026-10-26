@@ -153,13 +153,14 @@ int obtenerDirFisica(MV *mv)
 int cantidadOperandos(int codOp)
 {
     int cantOper;
+
     if (codOp >= 0x10)
         cantOper = 2;
     else
-        if (codOp <= 0x0A)
+        if (codOp <= 0x0D)  //antes era 0x0A
             cantOper = 1;
         else
-            if (codOp == 0x0F)
+            if (codOp == 0x0E || codOp == 0x0F) //antes  0x0F
                 cantOper = 0;
             else
                 errorMV("Instruccion invalida");

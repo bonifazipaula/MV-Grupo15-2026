@@ -39,6 +39,12 @@ void JNN(MV *mv);
 void JNZ(MV *mv);
 void NOT(MV *mv);
 
+
+void PUSH(MV *mv);
+void POP(MV *mv);
+void CALL(MV *mv);
+void RET(MV *mv);
+
 void STOP(MV *mv);
 
 void errorMV(char *mensaje);

@@ -44,6 +44,10 @@ void iniciaVectorFunciones(VectorFunciones vecF) {
     vecF[0x09]=&JNZ;    
     vecF[0x0A]=&NOT;
 
+    vecF[0x0B] = &PUSH;
+    vecF[0x0C] = &POP;
+    vecF[0x0D] = &CALL;
+    vecF[0x0E] = &RET;
     vecF[0x0F]=&STOP;
 }
 
@@ -435,3 +439,96 @@ void STOP(MV *mv){
     // Asignar -1 detiene el ciclo de ejecución de la máquina
     mv->tabla_de_registros[IP] = 0xFFFFFFFF;
 }
+
+//------------------------------Funciones para Pila-------------------------
+//EVALUAR SI QUEREMOS ORDENAR POR CANDIDAD DE OPERANDOS
+
+//obtIENE la dirección física de LA RAM
+//escrituta--> escribir(1) o leer (0)
+static uint32_t direccionPila(MV *mv, uint32_t sp, int escritura)  
+{   uint32_t ss = (uint32_t)mv->tabla_de_registros[SS];// identifico el segmento de la pila
+    uint32_t segmento = ss >> 16;
+    uint32_t inicio = ss & 0xFFFFu;
+    uint32_t indice = sp >> 16; //debe ser igual que segmento, evaluar que se cumpla esta cond.
+    uint32_t offset = sp & 0xFFFFu;
+    //INT32_MAX= valor máximo que puede almacenar un entero sin signo de 32 bits
+    if (ss == UINT32_MAX || segmento >= cantSeg || indice != segmento)
+        errorMV("Stack Segment invalido");
+
+    tabla_segmentos descriptor = mv->tabla_de_segmentos[segmento];// contiene la base fisica y el tamaño del segmento, veo si existe
+    if (descriptor.base == 0xFFFFu && descriptor.tam == 0xFFFFu)
+        errorMV("Stack Segment inexistente");
+
+    if (escritura) {
+        if (offset < inicio || offset > descriptor.tam ||descriptor.tam - offset < 4)
+            errorMV("STACK OVERFLOW");
+    } else {
+        if (offset < inicio || offset > descriptor.tam ||descriptor.tam - offset < 4)
+            errorMV("STACK UNDERFLOW");
+    }
+
+    uint32_t fisica = (uint32_t)descriptor.base + offset;// obtengo la direccion fisica= base del segmento + pffset de SP
+    if (fisica >= sizeof(mv->RAM) || sizeof(mv->RAM) - fisica < 4)
+        errorMV("Acceso fuera de RAM");
+    return fisica;
+}
+static void apilar(MV *mv, uint32_t valor)
+{   uint32_t sp = (uint32_t)mv->tabla_de_registros[SP];
+    uint32_t ss = (uint32_t)mv->tabla_de_registros[SS];
+    uint32_t segmento = ss >> 16;
+    uint32_t inicio = ss & 0xFFFFu;
+    uint32_t offset = sp & 0xFFFFu;
+    //comprueba que se puede agregar elemento a la pila
+    if (ss == UINT32_MAX || segmento >= cantSeg ||(sp >> 16) != segmento || offset < inicio || offset - inicio < 4)
+        errorMV("STACK OVERFLOW");
+    //Conserva el segmento y modifica únicamente el desplazamiento
+    uint32_t nuevoSP = (segmento << 16) | (offset - 4);
+    //calcula dirección física
+    uint32_t dir = direccionPila(mv, nuevoSP, 1);
+
+    mv->tabla_de_registros[SP] = nuevoSP;
+    mv->RAM[dir]     = (uint8_t)(valor >> 24);
+    mv->RAM[dir + 1] = (uint8_t)(valor >> 16);
+    mv->RAM[dir + 2] = (uint8_t)(valor >> 8);
+    mv->RAM[dir + 3] = (uint8_t)valor;
+}
+
+static uint32_t desapilar(MV *mv)
+{   uint32_t sp = (uint32_t)mv->tabla_de_registros[SP];
+    uint32_t dir = direccionPila(mv, sp, 0);
+    //Reconstruye el valor de 32 bits
+    uint32_t valor = ((uint32_t)mv->RAM[dir] << 24) |
+                     ((uint32_t)mv->RAM[dir + 1] << 16) |
+                     ((uint32_t)mv->RAM[dir + 2] << 8) |
+                     (uint32_t)mv->RAM[dir + 3];
+    //actualizo SP
+    mv->tabla_de_registros[SP] = (sp & 0xFFFF0000u) | ((sp + 4) & 0xFFFFu);
+    return valor;
+}
+
+void PUSH(MV *mv)
+{   int32_t valor = 0;
+    obtenerValorOperando(mv, (uint32_t)mv->tabla_de_registros[OP1], &valor);
+    apilar(mv, (uint32_t)valor);
+}
+
+void POP(MV *mv)
+{   uint32_t valor = desapilar(mv);
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], (int32_t)valor);
+}
+
+void CALL(MV *mv)
+{
+    int32_t destino = 0;
+    obtenerValorOperando(mv, (uint32_t)mv->tabla_de_registros[OP1], &destino);
+    //Resguarda IP actual
+    apilar(mv, (uint32_t)mv->tabla_de_registros[IP]);
+    uint32_t ip = (uint32_t)mv->tabla_de_registros[IP];
+    //cambia IP para saltar
+    mv->tabla_de_registros[IP] = (ip & 0xFFFF0000u) | ((uint32_t)destino & 0xFFFFu);
+}
+
+void RET(MV *mv)
+{   mv->tabla_de_registros[IP] = desapilar(mv);
+}
+
