@@ -9,7 +9,7 @@
                 "-g",
                 "${workspaceFolder}/*.c", 
                 "-o",
-                "${workspaceFolder}/Ejecutables/MV1vmx"
+                "${workspaceFolder}/Ejecutables/MV2/vmx"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

@@ -14,18 +14,18 @@ const char* obtenerMnemonico(uint32_t opc) {
         case 0x1F: return "RND"; case 0x00: return "SYS"; case 0x01: return "JMP";
         case 0x02: return "JP";  case 0x03: return "JN";  case 0x04: return "JZ";  
         case 0x05: return "JC";  case 0x06: return "JV";  case 0x07: return "JNP";
-        case 0x08: return "JNN"; case 0x09: return "JNZ"; case 0x0A: return "NOT"; 
-        case 0x0F: return "STOP";
+        case 0x08: return "JNN"; case 0x09: return "JNZ"; case 0x0A: return "NOT";
+        case 0x0B: return "PUSH"; case 0x0C: return "POP"; case 0x0D: return "CALL";
+        case 0x0E: return "RET"; case 0x0F: return "STOP";
         default: return "???";
     }
 }
 
 const char* nombreRegistro(uint32_t codReg) {
-    // Mapeo estándar según las posiciones numéricas (10=EAX, 27=DS, etc.)
     static const char* nombres[32] = {
-        "IP", "OPC", "OP1", "OP2", "LAR", "MAR", "MBR", "R7", "R8", "R9",
-        "EAX", "EBX", "ECX", "EDX", "EEX", "EFX", "AC", "CC", "R18", "R19",
-        "R20", "R21", "R22", "R23", "R24", "R25", "CS", "DS", "R28", "R29", "R30", "R31"
+        "IP", "OPC", "OP1", "OP2", "LAR", "MAR", "MBR", "SP", "BP", "",
+        "EAX", "EBX", "ECX", "EDX", "EEX", "EFX", "AC", "CC", "", "",
+        "", "", "", "", "", "", "CS", "DS", "ES", "SS", "KS", "PS"
     };
     if (codReg < 32) return nombres[codReg];
     return "???";
@@ -77,7 +77,7 @@ void muestraInstruccion(MV *mv, int dirFisica, int tamInstr) {
     int cantOper = 0;
 
     if (opc >= 0x10) cantOper = 2;
-    else if (opc <= 0x0A) cantOper = 1;
+    else if (opc <= 0x0D) cantOper = 1;
 
     char op1Str[32] = {0};
     char op2Str[32] = {0};

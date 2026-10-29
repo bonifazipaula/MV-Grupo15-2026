@@ -10,6 +10,8 @@
 #define MAR 5
 #define MBR 6
 
+#define SP 7
+#define BP 8
 
 #define EAX 10
 #define EBX 11
@@ -23,3 +25,7 @@
 
 #define CS 26
 #define DS 27
+#define ES 28
+#define SS 29
+#define KS 30
+#define PS 31
