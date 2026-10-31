@@ -1,0 +1,3 @@
+MOV EAX, 127
+MOV b[1024], AL
+STOP

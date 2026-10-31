@@ -505,97 +505,179 @@ void SYS(MV *mv){
     }
 }
 
-void PUSH(MV *mv){
+void PUSH(MV *mv)
+{
     int32_t valorOp1;
     obtenerValorOperando(mv, mv->tabla_de_registros[OP1], &valorOp1);
 
-    mv->tabla_de_registros[SP] -= 4;
+    uint32_t spVal = (uint32_t)mv->tabla_de_registros[SP];
+    uint32_t ssVal = (uint32_t)mv->tabla_de_registros[SS];
 
-    // Verificar stack overflow
-    int32_t spVal = mv->tabla_de_registros[SP];
-    int32_t ssVal = mv->tabla_de_registros[SS];
-    uint16_t spOffset = spVal & 0xFFFF;
-    uint16_t ssOffset = ssVal & 0xFFFF;
-    if (spOffset < ssOffset)
+    uint32_t segmento = spVal >> 16;
+    uint32_t segmentoSS = ssVal >> 16;
+
+    uint32_t spOffset = spVal & 0xFFFF;
+    uint32_t ssOffset = ssVal & 0xFFFF;
+
+    // Verificar que SP pertenezca al segmento de pila
+    if (segmentoSS >= cantSeg || segmento != segmentoSS)
         errorMV("Stack overflow");
 
-    uint16_t segmento = (spVal >> 16) & 0xFFFF;
-    int dirFisica = mv->tabla_de_segmentos[segmento].base + spOffset;
+    // Verificar que haya espacio antes de restar 4 bytes
+    if (spOffset < 4 || spOffset - 4 < ssOffset)
+        errorMV("Stack overflow");
 
+    uint32_t nuevoOffset = spOffset - 4;
+
+    // Verificar los limites del segmento
+    if (nuevoOffset + 4 > mv->tabla_de_segmentos[segmento].tam)
+        errorMV("Stack overflow");
+
+    uint32_t direccion = (uint32_t)mv->tabla_de_segmentos[segmento].base + nuevoOffset;
+
+    // Verificar que los 4 bytes entren en RAM
+    if (direccion >= (uint32_t)mv->tamRAM || (uint32_t)mv->tamRAM - direccion < 4)
+       errorMV("Stack overflow");
+    // Actualizar SP solamente despues de validar
+    mv->tabla_de_registros[SP] =
+        (long int)((segmento << 16) | nuevoOffset);
+
+    int dirFisica = (int)direccion;
+
+    // Guardar el valor en memoria (big endian)
     mv->RAM[dirFisica]     = (valorOp1 >> 24) & 0xFF;
     mv->RAM[dirFisica + 1] = (valorOp1 >> 16) & 0xFF;
     mv->RAM[dirFisica + 2] = (valorOp1 >> 8) & 0xFF;
     mv->RAM[dirFisica + 3] = valorOp1 & 0xFF;
 }
 
-void POP(MV *mv){
-    int32_t spVal = mv->tabla_de_registros[SP];
-    uint16_t segmento = (spVal >> 16) & 0xFFFF;
-    uint16_t offset = spVal & 0xFFFF;
+void POP(MV *mv)
+{
+    uint32_t spVal = (uint32_t)mv->tabla_de_registros[SP];
+    uint32_t ssVal = (uint32_t)mv->tabla_de_registros[SS];
 
-    // Verificar stack underflow
-    if (offset + 4 > mv->tabla_de_segmentos[segmento].tam)
+    uint32_t segmento = spVal >> 16;
+    uint32_t segmentoSS = ssVal >> 16;
+    uint32_t offset = spVal & 0xFFFF;
+    uint32_t ssOffset = ssVal & 0xFFFF;
+
+    // Verificar que SP pertenezca al Stack Segment
+    if (segmentoSS >= cantSeg || segmento != segmentoSS)
         errorMV("Stack underflow");
 
-    int dirFisica = mv->tabla_de_segmentos[segmento].base + offset;
+    // Verificar los limites del segmento
+    if (offset < ssOffset || offset + 4 > mv->tabla_de_segmentos[segmento].tam)
+        errorMV("Stack underflow");
 
-    int32_t valor = ((int32_t)mv->RAM[dirFisica] << 24) |
-                    ((int32_t)mv->RAM[dirFisica + 1] << 16) |
-                    ((int32_t)mv->RAM[dirFisica + 2] << 8) |
-                    (int32_t)mv->RAM[dirFisica + 3];
+    // Calcular y validar la direccion fisica
+    uint32_t direccion =(uint32_t)mv->tabla_de_segmentos[segmento].base + offset;
 
-    guardarValorOperando(mv, mv->tabla_de_registros[OP1], valor);
+    if (direccion >= (uint32_t)mv->tamRAM ||(uint32_t)mv->tamRAM - direccion < 4)
+        errorMV("Stack underflow");
 
-    mv->tabla_de_registros[SP] += 4;
+    // Leer el valor en big endian
+    uint32_t valor =
+        ((uint32_t)mv->RAM[direccion] << 24) |
+        ((uint32_t)mv->RAM[direccion + 1] << 16) |
+        ((uint32_t)mv->RAM[direccion + 2] << 8) |
+        (uint32_t)mv->RAM[direccion + 3];
+
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], (int32_t)valor);
+    mv->tabla_de_registros[SP] = (long int)((segmento << 16) | (offset + 4));
 }
 
-void CALL(MV *mv){
+void CALL(MV *mv)
+{
     int32_t valorOp1;
     obtenerValorOperando(mv, mv->tabla_de_registros[OP1], &valorOp1);
 
-    // PUSH IP (almacenar la dirección de retorno)
-    int32_t ipActual = (int32_t)mv->tabla_de_registros[IP];
-    mv->tabla_de_registros[SP] -= 4;
+    // Guardar la direccion de retorno
+    uint32_t ipActual = (uint32_t)mv->tabla_de_registros[IP];
 
-    // Verificar stack overflow
-    int32_t spVal = mv->tabla_de_registros[SP];
-    int32_t ssVal = mv->tabla_de_registros[SS];
-    uint16_t spOffset = spVal & 0xFFFF;
-    uint16_t ssOffset = ssVal & 0xFFFF;
-    if (spOffset < ssOffset)
+    uint32_t spVal = (uint32_t)mv->tabla_de_registros[SP];
+    uint32_t ssVal = (uint32_t)mv->tabla_de_registros[SS];
+
+    uint32_t segmento = spVal >> 16;
+    uint32_t segmentoSS = ssVal >> 16;
+
+    uint32_t spOffset = spVal & 0xFFFF;
+    uint32_t ssOffset = ssVal & 0xFFFF;
+
+    // Verificar que SP pertenezca al segmento de pila
+    if (segmentoSS >= cantSeg || segmento != segmentoSS)
         errorMV("Stack overflow");
 
-    uint16_t segmento = (spVal >> 16) & 0xFFFF;
-    int dirFisica = mv->tabla_de_segmentos[segmento].base + spOffset;
+    // Comprobar que haya espacio antes de restar
+    if (spOffset < 4 || spOffset - 4 < ssOffset)
+        errorMV("Stack overflow");
 
+    uint32_t nuevoOffset = spOffset - 4;
+
+    // Verificar los limites del segmento
+    if (nuevoOffset + 4 > mv->tabla_de_segmentos[segmento].tam)
+        errorMV("Stack overflow");
+
+    uint32_t direccion =
+        (uint32_t)mv->tabla_de_segmentos[segmento].base + nuevoOffset;
+
+    // Verificar los limites reales de RAM
+    if (direccion >= (uint32_t)mv->tamRAM ||
+        (uint32_t)mv->tamRAM - direccion < 4)
+        errorMV("Stack overflow");
+
+    // Actualizar SP solamente despues de validar
+    mv->tabla_de_registros[SP] =
+        (long int)((segmento << 16) | nuevoOffset);
+
+    int dirFisica = (int)direccion;
+
+    // Guardar IP en la pila (big endian)
     mv->RAM[dirFisica]     = (ipActual >> 24) & 0xFF;
     mv->RAM[dirFisica + 1] = (ipActual >> 16) & 0xFF;
     mv->RAM[dirFisica + 2] = (ipActual >> 8) & 0xFF;
     mv->RAM[dirFisica + 3] = ipActual & 0xFF;
 
-    // JMP: modificar los 2 bytes menos significativos del IP con el valor del operando
-    mv->tabla_de_registros[IP] = (mv->tabla_de_registros[IP] & 0xFFFF0000) | (valorOp1 & 0xFFFF);
+    // Saltar a la direccion indicada por el operando
+    mv->tabla_de_registros[IP] =
+        (mv->tabla_de_registros[IP] & 0xFFFF0000) |
+        (valorOp1 & 0xFFFF);
 }
 
 //------------------------------- Sin Operandos --------------------------------------
-void RET(MV *mv){
-    // POP IP: extraer 4 bytes del tope de la pila y cargar en IP
-    int32_t spVal = mv->tabla_de_registros[SP];
-    uint16_t segmento = (spVal >> 16) & 0xFFFF;
-    uint16_t offset = spVal & 0xFFFF;
+void RET(MV *mv)
+{
+    uint32_t spVal = (uint32_t)mv->tabla_de_registros[SP];
+    uint32_t ssVal = (uint32_t)mv->tabla_de_registros[SS];
 
-    if (offset + 4 > mv->tabla_de_segmentos[segmento].tam)
+    uint32_t segmento = spVal >> 16;
+    uint32_t segmentoSS = ssVal >> 16;
+    uint32_t offset = spVal & 0xFFFF;
+    uint32_t ssOffset = ssVal & 0xFFFF;
+
+    // Verificar que SP pertenezca al Stack Segment
+    if (segmentoSS >= cantSeg || segmento != segmentoSS)
         errorMV("Stack underflow");
 
-    int dirFisica = mv->tabla_de_segmentos[segmento].base + offset;
+    // Verificar los limites del segmento
+    if (offset < ssOffset ||
+        offset + 4 > mv->tabla_de_segmentos[segmento].tam)
+        errorMV("Stack underflow");
 
-    int32_t valor = ((int32_t)mv->RAM[dirFisica] << 24) |
-                    ((int32_t)mv->RAM[dirFisica + 1] << 16) |
-                    ((int32_t)mv->RAM[dirFisica + 2] << 8) |
-                    (int32_t)mv->RAM[dirFisica + 3];
+    // Calcular y validar la direccion fisica
+    uint32_t direccion =(uint32_t)mv->tabla_de_segmentos[segmento].base + offset;
 
-    mv->tabla_de_registros[IP] = valor;
-    mv->tabla_de_registros[SP] += 4;
+    if (direccion >= (uint32_t)mv->tamRAM || (uint32_t)mv->tamRAM - direccion < 4)
+        errorMV("Stack underflow");
+
+    // Recuperar la direccion de retorno en big endian
+    uint32_t valor =
+        ((uint32_t)mv->RAM[direccion] << 24) |
+        ((uint32_t)mv->RAM[direccion + 1] << 16) |
+        ((uint32_t)mv->RAM[direccion + 2] << 8) |
+        (uint32_t)mv->RAM[direccion + 3];
+
+    mv->tabla_de_registros[IP] = (long int)valor;
+    mv->tabla_de_registros[SP] =  (long int)((segmento << 16) | (offset + 4));
 }
 
 void STOP(MV *mv){

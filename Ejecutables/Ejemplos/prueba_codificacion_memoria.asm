@@ -1,0 +1,5 @@
+MOV EAX, b[100]
+MOV EAX, w[100]
+MOV EAX, l[100]
+MOV EAX, [100]
+STOP

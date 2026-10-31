@@ -231,23 +231,36 @@ static int construirParamSegment(MV *mv, Parametros *params, int baseParamSeg)
 
 // Manejo de la pila como se explica en la pág 4 de la especificación V2
 static void pushEnPila(MV *mv, int32_t valor)
-{
-    mv->tabla_de_registros[SP] -= 4;
+{    uint32_t spVal = (uint32_t)mv->tabla_de_registros[SP];
+    uint32_t ssVal = (uint32_t)mv->tabla_de_registros[SS];
 
-    int32_t spVal = mv->tabla_de_registros[SP];
-    uint16_t segmento = (spVal >> 16) & 0xFFFF;
-    uint16_t offset = spVal & 0xFFFF;
+    uint32_t segmento = spVal >> 16;
+    uint32_t segmentoSS = ssVal >> 16;
 
-    if ((int)offset < 0 || segmento >= cantSeg)
-        errorMV("Stack overflow");
+    uint32_t spOffset = spVal & 0xFFFF;
+    uint32_t ssOffset = ssVal & 0xFFFF;
+    // Validar el segmento antes de utilizarlo como índice
+    if (segmentoSS >= cantSeg || segmento != segmentoSS)
+    errorMV("Stack overflow");
 
-    // Verificar que SP no baje del inicio del Stack Segment
-    int32_t ssVal = mv->tabla_de_registros[SS];
-    uint16_t ssOffset = ssVal & 0xFFFF;
-    if (offset < ssOffset)
-        errorMV("Stack overflow");
+   // Comprobar el espacio ANTES de restar 4
+   if (spOffset < 4 || spOffset - 4 < ssOffset)
+      errorMV("Stack overflow");
 
-    int dirFisica = mv->tabla_de_segmentos[segmento].base + offset;
+   uint32_t nuevoOffset = spOffset - 4;
+
+   if (nuevoOffset + 4 > mv->tabla_de_segmentos[segmento].tam)
+       errorMV("Stack overflow");
+
+   uint32_t direccion =(uint32_t)mv->tabla_de_segmentos[segmento].base + nuevoOffset;
+
+   if (direccion >= (uint32_t)mv->tamRAM ||  (uint32_t)mv->tamRAM - direccion < 4)
+       errorMV("Stack overflow");
+
+   // Actualizar SP únicamente después de validar
+   mv->tabla_de_registros[SP] = (long int)((segmento << 16) | nuevoOffset);
+   int dirFisica = (int)direccion;
+   
 
     mv->RAM[dirFisica]     = (valor >> 24) & 0xFF;
     mv->RAM[dirFisica + 1] = (valor >> 16) & 0xFF;
@@ -658,13 +671,16 @@ void cargarOperandos(MV *mv, int dirFisica, int cantOper, unsigned char tipoOpA,
 
 int obtenerDirFisicaOperando(MV *mv, long int operando, long int *dirLogicaEfectiva)
 {
-    unsigned char codReg;
+    unsigned char codReg = operando & 0x1F;
+    int tamanio = (operando >> 5) & 0x07;
     int offsetFinal, dirFisica;
     long int dirLogica;
     short int desplazamiento;
     unsigned short int segmento, offset;
 
-    codReg = operando & 0x1F;
+    if (tamanio != 1 && tamanio != 2 && tamanio != 4)
+        errorMV("Tamanio de memoria invalido");
+
     desplazamiento = (short int)((operando >> 8) & 0xFFFF);
 
     dirLogica = mv->tabla_de_registros[codReg];
@@ -672,16 +688,19 @@ int obtenerDirFisicaOperando(MV *mv, long int operando, long int *dirLogicaEfect
     offset = dirLogica & 0xFFFF;
 
     offsetFinal = (int)offset + desplazamiento;
+
     if (segmento >= cantSeg)
         errorMV("Segmento invalido");
 
     if (mv->tabla_de_segmentos[segmento].base == 0xFFFF && mv->tabla_de_segmentos[segmento].tam == 0xFFFF)
         errorMV("Segmento invalido");
 
-    if (offsetFinal < 0 || offsetFinal + 4 >= mv->tabla_de_segmentos[segmento].tam)
+    if (offsetFinal < 0 || offsetFinal + tamanio > mv->tabla_de_segmentos[segmento].tam)
         errorMV("Direccion fuera del segmento");
 
-    *dirLogicaEfectiva = ((long int)segmento << 16) | (offsetFinal & 0xFFFF);
+    *dirLogicaEfectiva = ((long int)segmento << 16) |
+                         (offsetFinal & 0xFFFF);
+
     dirFisica = mv->tabla_de_segmentos[segmento].base + offsetFinal;
 
     return dirFisica;
@@ -690,19 +709,27 @@ int obtenerDirFisicaOperando(MV *mv, long int operando, long int *dirLogicaEfect
 void leerMemoria(MV *mv, long int operando, long int *valor)
 {
     int dirFisica;
+    int tamanio = (operando >> 5) & 0x07;
     long int dirLogica;
+    uint32_t dato = 0;
 
     dirFisica = obtenerDirFisicaOperando(mv, operando, &dirLogica);
 
     mv->tabla_de_registros[LAR] = dirLogica;
-    mv->tabla_de_registros[MAR] = ((long int)4 << 16) | (dirFisica & 0xFFFF);
+    mv->tabla_de_registros[MAR] =  ((long int)tamanio << 16) | (dirFisica & 0xFFFF);
 
-    *valor = 0;
+    for (int i = 0; i < tamanio; i++)
+    {     dato = (dato << 8) | mv->RAM[dirFisica + i];
+    }
 
-    *valor |= ((long int)mv->RAM[dirFisica] << 24);
-    *valor |= ((long int)mv->RAM[dirFisica + 1] << 16);
-    *valor |= ((long int)mv->RAM[dirFisica + 2] << 8);
-    *valor |= ((long int)mv->RAM[dirFisica + 3]);
+    if (tamanio == 1)
+        *valor = (int8_t)dato;
+    else 
+      if (tamanio == 2)
+        *valor = (int16_t)dato;
+      else
+       *valor = (int32_t)dato;
+
     mv->tabla_de_registros[MBR] = *valor;
 }
 
@@ -713,57 +740,90 @@ void obtenerValorOperando(MV *mv, uint32_t operando, int32_t *valor)
     unsigned char codReg;
 
     if (tipo == 1) // REGISTRO
-    {
-        codReg = operando & 0x1F;
-        *valor = (int32_t)mv->tabla_de_registros[codReg];
+    {   codReg = operando & 0x1F;
+        unsigned char sector = (operando >> 5) & 0x03;
+
+        uint32_t registro =
+            (uint32_t)mv->tabla_de_registros[codReg];
+        switch (sector)
+        {   case 0: // Registro completo: EAX
+                *valor = (int32_t)registro;
+                break;
+           case 1: // AL: 8 bits con signo
+               *valor = (int8_t)(registro & 0xFFu);
+               break;
+            case 2: // AH: 8 bits con signo
+               *valor = (int8_t)((registro >> 8) & 0xFFu);
+               break;
+            case 3: // AX: 16 bits con signo
+               *valor = (int16_t)(registro & 0xFFFFu);
+               break;
+        }
     }
-    else if (tipo == 2) // INMEDIATO
-    {
-        *valor = (int16_t)(operando & 0xFFFF);
-    }
-    else if (tipo == 3) // MEMORIA
-    {
-        long int valorTemp;
-        leerMemoria(mv, operando, &valorTemp);
-        *valor = (int32_t)valorTemp;
-    }
-    else if (tipo != 0) // Si es 0 (ninguno) no hace nada
-    {
-        errorMV("Tipo de operando erroneo");
-    }
+    else 
+       if (tipo == 2) // INMEDIATO
+       { *valor = (int16_t)(operando & 0xFFFF);}
+       else 
+          if (tipo == 3) // MEMORIA
+          {  long int valorTemp;
+             leerMemoria(mv, operando, &valorTemp);
+            *valor = (int32_t)valorTemp;
+          }
+           else 
+            if (tipo != 0)
+            {   errorMV("Tipo de operando erroneo"); }
 }
 
 void escribirMemoria(MV *mv, long int operando, long int valor)
 {
     int dirFisica;
+    int tamanio = (operando >> 5) & 0x07;
     long int dirLogica;
+    uint32_t dato = (uint32_t)valor;
 
     dirFisica = obtenerDirFisicaOperando(mv, operando, &dirLogica);
 
     mv->tabla_de_registros[LAR] = dirLogica;
-    mv->tabla_de_registros[MAR] = ((long int)4 << 16) | (dirFisica & 0xFFFF);
+    mv->tabla_de_registros[MAR] =  ((long int)tamanio << 16) | (dirFisica & 0xFFFF);
 
-    mv->RAM[dirFisica] = (valor >> 24) & 0xFF;
-    mv->RAM[dirFisica + 1] = (valor >> 16) & 0xFF;
-    mv->RAM[dirFisica + 2] = (valor >> 8) & 0xFF;
-    mv->RAM[dirFisica + 3] = valor & 0xFF;
-
+    for (int i = 0; i < tamanio; i++)
+    {  mv->RAM[dirFisica + i] = (dato >> (8 * (tamanio - 1 - i))) & 0xFF;
+    }
     mv->tabla_de_registros[MBR] = valor;
 }
 
 void guardarValorOperando(MV *mv, long int operando, long int valor)
 {
-    unsigned char tipo, codReg;
-    tipo = (operando >> 24) & 0xFF;
+    unsigned char tipo = (operando >> 24) & 0xFF;
+
     if (tipo == 1)
-    {
-        codReg = operando & 0x1F;
-        mv->tabla_de_registros[codReg] = valor;
+    {   unsigned char codReg = operando & 0x1F;
+        unsigned char sector = (operando >> 5) & 0x03;
+
+        uint32_t actual = (uint32_t)mv->tabla_de_registros[codReg];
+        uint32_t nuevo = (uint32_t)valor;
+
+        switch (sector)
+        {   case 0: // Registro completo: EAX
+                actual = nuevo;
+                break;
+            case 1: // Byte bajo: AL
+                actual = (actual & 0xFFFFFF00u) | (nuevo & 0xFFu);
+                break;
+            case 2: // Byte alto: AH
+                actual = (actual & 0xFFFF00FFu) | ((nuevo & 0xFFu) << 8);
+                break;
+             case 3: // Dos bytes bajos: AX
+                actual = (actual & 0xFFFF0000u) | (nuevo & 0xFFFFu);
+                break;
+        }
+        mv->tabla_de_registros[codReg] = (int32_t)actual;
     }
-    else if (tipo == 3)
-        escribirMemoria(mv, operando, valor);
-    else
-        errorMV("Operando destino invalido");
+    else 
+       if (tipo == 3)
+       {   escribirMemoria(mv, operando, valor);}
+       else
+       {  errorMV("Operando destino invalido");}
 }
 
 void ejecutarInstruccion(MV *mv, VectorFunciones vecF)
@@ -781,9 +841,19 @@ void ejecutarPrograma(MV *mv, int flagDisassembler)
     int csIdx = (mv->tabla_de_registros[CS] >> 16) & 0xFFFF;
 
     iniciaVectorFunciones(vecF);
-    while ((mv->tabla_de_registros[IP] != (long int)0xFFFFFFFF) &&
-           ((mv->tabla_de_registros[IP] & 0xFFFF) < mv->tabla_de_segmentos[csIdx].tam))
-    {
+    while ((uint32_t)mv->tabla_de_registros[IP] != UINT32_MAX)
+    {   uint32_t ip = (uint32_t)mv->tabla_de_registros[IP];
+        uint32_t segmentoIP = ip >> 16;
+        uint32_t offsetIP = ip & 0xFFFF;
+
+        if (csIdx < 0 || csIdx >= cantSeg)
+       {   errorMV("Code Segment invalido");
+       }
+
+     if (segmentoIP != (uint32_t)csIdx ||offsetIP >= mv->tabla_de_segmentos[csIdx].tam)
+     { break;
+     }
+
         dirFisica = obtenerDirFisica(mv);
         instruccion = mv->RAM[dirFisica];
         mv->tabla_de_registros[OPC] = instruccion & 0x1F;
