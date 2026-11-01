@@ -363,7 +363,7 @@ void SYS(MV *mv){
 
             int32_t datoNuevo = 0;
 
-            printf("[%04X]", dirFisica);
+            printf("[%04X] ", dirFisica);
 
             // Se utiliza if/else if porque al ingresar por teclado solo se puede tipear en una base a la vez
             // se puede borran los cartelitos pero me parece cómodo para saber que tipo de dato se está ingresando
@@ -411,7 +411,7 @@ void SYS(MV *mv){
                 datoLeido = (datoLeido << 8) | mv->RAM[dirFisica + b];
             }
 
-            printf("[%04X]", dirFisica);
+            printf("[%04X] ", dirFisica);
             // Imprimir evaluando los bits de la máscara (pueden ser múltiples formatos simultáneos, por eso no se usa switch)
             if (config & 0x10) { 
                 printf("0b");
@@ -436,51 +436,90 @@ void SYS(MV *mv){
             printf("\n");
         }
     }
+      
     else if (valorOp1 == 3) {
-        // SYS 3: STRING READ - leer string desde teclado
-        // EDX apunta a la posición de memoria donde almacenar
-        // ECX = cantidad máxima de caracteres (-1 = sin límite)
+        // SYS 3: STRING READ
         int32_t maxChars = (int32_t)mv->tabla_de_registros[ECX];
         uint32_t segmento = (punteroEDX >> 16) & 0xFFFF;
         uint32_t offset = punteroEDX & 0xFFFF;
-        int dirFisica = mv->tabla_de_segmentos[segmento].base + offset;
 
-        if (maxChars == -1) {
-            // Sin límite: leer hasta newline
-            int c;
-            int pos = 0;
-            while ((c = getchar()) != '\n' && c != EOF) {
-                mv->RAM[dirFisica + pos] = (unsigned char)c;
-                pos++;
-            }
-            mv->RAM[dirFisica + pos] = '\0';
-        } else {
-            // Con límite
-            int c;
-            int pos = 0;
-            while (pos < maxChars && (c = getchar()) != '\n' && c != EOF) {
-                mv->RAM[dirFisica + pos] = (unsigned char)c;
-                pos++;
-            }
-            mv->RAM[dirFisica + pos] = '\0';
-            if (pos >= maxChars) {
-                while ((c = getchar()) != '\n' && c != EOF);
-            }
+        if (segmento >= cantSeg)
+            errorMV("Segmento invalido");
+
+        uint32_t base = mv->tabla_de_segmentos[segmento].base;
+        uint32_t tam = mv->tabla_de_segmentos[segmento].tam;
+
+        if (base == 0xFFFF && tam == 0xFFFF)
+            errorMV("Segmento invalido");
+
+        if (offset >= tam)
+            errorMV("Direccion fuera del segmento");
+
+        if (base >= (uint32_t)mv->tamRAM ||
+            tam > (uint32_t)mv->tamRAM - base)
+            errorMV("Direccion fuera de RAM");
+
+        if (maxChars < -1)
+            errorMV("Cantidad de caracteres invalida");
+
+        uint32_t disponibles = tam - offset;
+        uint32_t dirFisica = base + offset;
+        uint32_t pos = 0;
+        int c;
+
+        while ((maxChars == -1 || pos < (uint32_t)maxChars) &&
+               (c = getchar()) != '\n' && c != EOF) {
+
+            // Reservar siempre un byte para '\0'
+            if (pos >= disponibles - 1)
+                errorMV("Direccion fuera del segmento");
+
+            mv->RAM[dirFisica + pos] = (unsigned char)c;
+            pos++;
+        }
+
+        mv->RAM[dirFisica + pos] = '\0';
+
+        // Descartar caracteres sobrantes cuando se alcanza ECX
+        if (maxChars >= 0 && pos >= (uint32_t)maxChars) {
+            while ((c = getchar()) != '\n' && c != EOF)
+                ;
         }
     }
     else if (valorOp1 == 4) {
-        // SYS 4: STRING WRITE - imprimir string desde memoria
-        // EDX apunta a la posición de memoria del string
+        // SYS 4: STRING WRITE
         uint32_t segmento = (punteroEDX >> 16) & 0xFFFF;
         uint32_t offset = punteroEDX & 0xFFFF;
-        int dirFisica = mv->tabla_de_segmentos[segmento].base + offset;
 
-        while (mv->RAM[dirFisica] != '\0') {
+        if (segmento >= cantSeg)
+            errorMV("Segmento invalido");
+
+        uint32_t base = mv->tabla_de_segmentos[segmento].base;
+        uint32_t tam = mv->tabla_de_segmentos[segmento].tam;
+
+        if (base == 0xFFFF && tam == 0xFFFF)
+            errorMV("Segmento invalido");
+
+        if (offset >= tam)
+            errorMV("Direccion fuera del segmento");
+
+        if (base >= (uint32_t)mv->tamRAM ||
+            tam > (uint32_t)mv->tamRAM - base)
+            errorMV("Direccion fuera de RAM");
+
+        uint32_t dirFisica = base + offset;
+
+        while (offset < tam && mv->RAM[dirFisica] != '\0') {
             putchar(mv->RAM[dirFisica]);
             dirFisica++;
+            offset++;
         }
+        if (offset >= tam)
+            errorMV("Cadena sin terminador dentro del segmento");
+
         fflush(stdout);
     }
+  
     else if (valorOp1 == 0x0F) {
         // SYS F: BREAKPOINT
         if (mv->archivoVMI != NULL) {
@@ -506,11 +545,7 @@ void SYS(MV *mv){
 }
 
 void PUSH(MV *mv)
-{
-    int32_t valorOp1;
-    obtenerValorOperando(mv, mv->tabla_de_registros[OP1], &valorOp1);
-
-    uint32_t spVal = (uint32_t)mv->tabla_de_registros[SP];
+{   uint32_t spVal = (uint32_t)mv->tabla_de_registros[SP];
     uint32_t ssVal = (uint32_t)mv->tabla_de_registros[SS];
 
     uint32_t segmento = spVal >> 16;
@@ -538,9 +573,12 @@ void PUSH(MV *mv)
     // Verificar que los 4 bytes entren en RAM
     if (direccion >= (uint32_t)mv->tamRAM || (uint32_t)mv->tamRAM - direccion < 4)
        errorMV("Stack overflow");
-    // Actualizar SP solamente despues de validar
+    // Actualizar SP  despues de validar
     mv->tabla_de_registros[SP] =
         (long int)((segmento << 16) | nuevoOffset);
+    // Obtener el operando con SP ya decrementado
+    int32_t valorOp1;
+    obtenerValorOperando(mv, mv->tabla_de_registros[OP1], &valorOp1);
 
     int dirFisica = (int)direccion;
 
@@ -550,7 +588,6 @@ void PUSH(MV *mv)
     mv->RAM[dirFisica + 2] = (valorOp1 >> 8) & 0xFF;
     mv->RAM[dirFisica + 3] = valorOp1 & 0xFF;
 }
-
 void POP(MV *mv)
 {
     uint32_t spVal = (uint32_t)mv->tabla_de_registros[SP];
@@ -582,8 +619,22 @@ void POP(MV *mv)
         ((uint32_t)mv->RAM[direccion + 2] << 8) |
         (uint32_t)mv->RAM[direccion + 3];
 
-    guardarValorOperando(mv, mv->tabla_de_registros[OP1], (int32_t)valor);
-    mv->tabla_de_registros[SP] = (long int)((segmento << 16) | (offset + 4));
+    long int operandoDestino = mv->tabla_de_registros[OP1];
+
+    unsigned char tipo = (operandoDestino >> 24) & 0xFF;
+    unsigned char codReg = operandoDestino & 0x1F;
+    unsigned char sector = (operandoDestino >> 5) & 0x03;
+
+    guardarValorOperando(mv, operandoDestino, (int32_t)valor);
+
+    if (tipo == 1 && codReg == SP && sector == 0)
+    {  uint32_t nuevoSP = (uint32_t)mv->tabla_de_registros[SP];
+        mv->tabla_de_registros[SP] = (long int)(nuevoSP + 4u);
+    }
+    else
+    {   mv->tabla_de_registros[SP] =
+            (long int)((segmento << 16) | (offset + 4));
+    }
 }
 
 void CALL(MV *mv)

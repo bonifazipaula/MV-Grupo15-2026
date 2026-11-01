@@ -839,8 +839,12 @@ void ejecutarPrograma(MV *mv, int flagDisassembler)
 
     // Obtener el índice del Code Segment para verificar fin de ejecución
     int csIdx = (mv->tabla_de_registros[CS] >> 16) & 0xFFFF;
-
+    int dirEntrada = obtenerDirFisica(mv);
     iniciaVectorFunciones(vecF);
+
+    if (flagDisassembler)
+    {   mostrarConstantes(mv);}
+
     while ((uint32_t)mv->tabla_de_registros[IP] != UINT32_MAX)
     {   uint32_t ip = (uint32_t)mv->tabla_de_registros[IP];
         uint32_t segmentoIP = ip >> 16;
@@ -866,15 +870,24 @@ void ejecutarPrograma(MV *mv, int flagDisassembler)
         mv->tabla_de_registros[IP] += tamInstr;
 
         if (flagDisassembler)
-            muestraInstruccion(mv, dirFisica, tamInstr);
+           muestraInstruccion(mv, dirFisica, tamInstr, dirEntrada);
 
+        int estabaEnStepMode = mv->stepMode;
+
+        /* Identificar si la instrucción actual es SYS F */
+        int esSysF = 0;
+
+        if (mv->tabla_de_registros[OPC] == 0)
+        {  int32_t valorSys;
+           obtenerValorOperando(mv, mv->tabla_de_registros[OP1], &valorSys);
+           esSysF = (valorSys == 0x0F);
+        }
         ejecutarInstruccion(mv, vecF);
 
-        // Modo paso a paso (después de cada instrucción, hacer breakpoint)
-        if (mv->stepMode && mv->tabla_de_registros[IP] != (long int)0xFFFFFFFF)
-        {
-            if (manejarBreakpoint(mv) < 0)
-                break; // quit
+        /* SYS F ya administra su propia pausa */
+        if (estabaEnStepMode && mv->stepMode && !esSysF && (uint32_t)mv->tabla_de_registros[IP] != UINT32_MAX)
+        {  if (manejarBreakpoint(mv) < 0)
+            break;
         }
     }
 }

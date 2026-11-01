@@ -4,6 +4,6 @@
 #define Disassembler_H_INCLUDED
 #include "MV.h"
 
-void muestraInstruccion(MV *mv, int dirFisica, int tamInstr);
-
+void muestraInstruccion(MV *mv, int dirFisica, int tamInstr, int dirEntrada);
+void mostrarConstantes(MV *mv);
 #endif
