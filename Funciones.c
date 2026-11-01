@@ -618,23 +618,11 @@ void POP(MV *mv)
         ((uint32_t)mv->RAM[direccion + 1] << 16) |
         ((uint32_t)mv->RAM[direccion + 2] << 8) |
         (uint32_t)mv->RAM[direccion + 3];
+    
+    guardarValorOperando(mv, mv->tabla_de_registros[OP1], (int32_t)valor);
+    mv->tabla_de_registros[SP] = (long int)((segmento << 16) | (offset + 4));
 
-    long int operandoDestino = mv->tabla_de_registros[OP1];
-
-    unsigned char tipo = (operandoDestino >> 24) & 0xFF;
-    unsigned char codReg = operandoDestino & 0x1F;
-    unsigned char sector = (operandoDestino >> 5) & 0x03;
-
-    guardarValorOperando(mv, operandoDestino, (int32_t)valor);
-
-    if (tipo == 1 && codReg == SP && sector == 0)
-    {  uint32_t nuevoSP = (uint32_t)mv->tabla_de_registros[SP];
-        mv->tabla_de_registros[SP] = (long int)(nuevoSP + 4u);
-    }
-    else
-    {   mv->tabla_de_registros[SP] =
-            (long int)((segmento << 16) | (offset + 4));
-    }
+    
 }
 
 void CALL(MV *mv)
