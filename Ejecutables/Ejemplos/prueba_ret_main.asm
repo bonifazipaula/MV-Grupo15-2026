@@ -1,0 +1,2 @@
+main: MOV EAX, 1234
+RET

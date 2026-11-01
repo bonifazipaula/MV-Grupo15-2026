@@ -4,18 +4,36 @@
 #include "Funciones.h"
 
 int main(int argc, char *argv[])
-{   MV maquina;
-    inicializarMV(&maquina);
+{
+    MV maquina;
+    Parametros params;
 
-    if (argc > 1)
-        cargarPrograma(&maquina, argv[1], argc > 2 ? argv[2] : NULL);
+    // Parsear argumentos de la línea de comandos
+    parsearArgumentos(argc, argv, &params);
+
+    // Inicializar la MV con el tamaño de memoria indicado
+    inicializarMV(&maquina, params.tamMemoria);
+
+    // Guardar referencia al archivo VMI para breakpoints
+    maquina.archivoVMI = params.archivoVMI;
+
+    if (params.archivoVMX != NULL)
+    {
+        // Cargar y ejecutar el programa .vmx
+        cargarPrograma(&maquina, &params);
+        ejecutarPrograma(&maquina, params.flagDisassembler);
+    }
+    else if (params.archivoVMI != NULL)
+    {
+        // Cargar imagen .vmi y continuar ejecución
+        cargarImagen(&maquina, params.archivoVMI);
+        ejecutarPrograma(&maquina, params.flagDisassembler);
+    }
     else
-        errorMV("Falta indicar el archivo VMX");
+    {
+        errorMV("Debe indicarse al menos un archivo .vmx o .vmi");
+    }
 
+    liberarMV(&maquina);
     return 0;
 }
-
-/*
-    argv[1];         //código traducido
-    argv[2];         // flag, si no es null se muestra el disassembler
-*/

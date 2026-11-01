@@ -1,11 +1,12 @@
-OUT_DIR = Ejecutables/MV1
+OUT_DIR = Ejecutables/MV2
+TARGET = $(OUT_DIR)/vmx
 
-vmx: main.c MV.c Funciones.c Disassembler.c
+$(TARGET): main.c MV.c Funciones.c Disassembler.c
 	mkdir -p $(OUT_DIR)
-	gcc -g *.c -o $(OUT_DIR)/vmx
+	gcc -g *.c -o $(TARGET)
 
 clean:
-	rm -f $(OUT_DIR)/vmx
+	rm -f $(TARGET)
 
 #direccion en donde se encuentra el traductor para que sea más fácil testear
 

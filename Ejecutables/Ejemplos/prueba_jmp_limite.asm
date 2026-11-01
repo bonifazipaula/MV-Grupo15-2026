@@ -1,0 +1,2 @@
+JMP 4
+STOP

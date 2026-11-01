@@ -1,7 +1,7 @@
 # MV-Grupo15-2026
 
-Implementación en C de la Máquina Virtual MV1, basada en la especificación del
-trabajo práctico MV1 2026.
+Implementación en C de la Máquina Virtual MV2, basada en la especificación del
+trabajo práctico MV2 2026.
 
 La máquina virtual dispone de memoria RAM, registros y una tabla de segmentos.
 Puede cargar un programa binario con formato `.vmx`, validar su encabezado,
@@ -35,7 +35,7 @@ make
 El comando crea el directorio de salida si no existe y genera el ejecutable:
 
 ```text
-Ejecutables/MV1/vmx
+Ejecutables/MV2/vmx
 ```
 
 También se puede compilar directamente el target del Makefile:
@@ -55,7 +55,7 @@ make clean
 El ejecutable recibe como argumento la ruta a un archivo `.vmx`:
 
 ```bash
-./vmx filename.vmx [-d]
+./vmx [filename.vmx] [filename.vmi] [m=M] [-d] [-p param1 param2 ... paramN]
 ```
 
 Si no se indica un archivo, o si el archivo no tiene un formato VMX válido, la

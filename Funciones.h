@@ -27,6 +27,10 @@ void LDL(MV *mv);
 void LDH(MV *mv);
 void RND(MV *mv);
 
+void PUSH(MV *mv);
+void POP(MV *mv);
+void CALL(MV *mv);
+
 void SYS(MV *mv);
 void JMP(MV *mv);
 void JP(MV *mv);
@@ -39,6 +43,7 @@ void JNN(MV *mv);
 void JNZ(MV *mv);
 void NOT(MV *mv);
 
+void RET(MV *mv);
 void STOP(MV *mv);
 
 void errorMV(char *mensaje);
